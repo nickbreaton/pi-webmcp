@@ -80,15 +80,13 @@ async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
     const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: tool.targetId, flatten: true });
     try {
       await cdp.send("WebMCP.enable", {}, sessionId);
-      const invokeResult: any = await cdp.send("WebMCP.invokeTool", {
-        frameId: tool.frameId,
-        toolName: tool.name,
-        input,
-      }, sessionId);
-
-      const invocationId = invokeResult.invocationId;
-      const response = await new Promise<any>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error("Timed out waiting for WebMCP.toolResponded")), 60_000);
+      let invocationId: string | undefined;
+      const responsePromise = new Promise<any>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          reject(new Error(
+            "Timed out waiting for WebMCP.toolResponded. The page accepted the invocation but did not respond; declarative form tools may require the page/form to opt into toolautosubmit or otherwise call event.respondWith(...).",
+          ));
+        }, 60_000);
         cdp.on("WebMCP.toolResponded", (ev: any, evSessionId?: string) => {
           if (evSessionId !== sessionId) return;
           if (!invocationId || ev.invocationId === invocationId) {
@@ -97,6 +95,15 @@ async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
           }
         });
       });
+
+      const invokeResult: any = await cdp.send("WebMCP.invokeTool", {
+        frameId: tool.frameId,
+        toolName: tool.name,
+        input,
+      }, sessionId);
+      invocationId = invokeResult.invocationId;
+
+      const response = await responsePromise;
       return { invokeResult, response };
     } finally {
       await cdp.send("Target.detachFromTarget", { sessionId }).catch(() => { });
