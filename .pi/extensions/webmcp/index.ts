@@ -23,6 +23,7 @@ type CdpClient = Client & {
   send(method: string, params?: any, sessionId?: string): Promise<any>;
   on(method: string, cb: (params: any, sessionId?: string) => void): void;
   once(method: string, cb: (...args: any[]) => void): void;
+  close(): Promise<void> | void;
 };
 
 function safeName(input: string) {
@@ -47,6 +48,20 @@ async function openBrowser(): Promise<CdpClient> {
   browserClient.once?.("disconnect", clear);
   browserClient.once?.("error", clear);
   return browserClient;
+}
+
+async function disconnectBrowser(): Promise<void> {
+  const cdp = browserClient;
+  if (!cdp) return;
+
+  const sessions = [...attachedSessions.values()];
+  attachedSessions.clear();
+  browserClient = undefined;
+
+  await Promise.allSettled(
+    sessions.map(sessionId => cdp.send("Target.detachFromTarget", { sessionId })),
+  );
+  await Promise.resolve(cdp.close());
 }
 
 async function getAttachedSession(cdp: CdpClient, targetId: string): Promise<string> {
@@ -120,6 +135,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   const registered = new Set<string>();
   const registry = new Map<string, WebMcpTool>();
 
+  pi.on("session_shutdown", async () => {
+    await disconnectBrowser();
+  });
+
   async function registerDiscovered(filter = "", notify?: (msg: string) => void) {
     const tools = await scanWebMcpTools(filter);
     for (const tool of tools) {
@@ -176,6 +195,14 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       } catch (err: any) {
         ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
       }
+    },
+  });
+
+  pi.registerCommand("webmcp-disconnect", {
+    description: "Disconnect pi from Chrome's remote debugging session",
+    handler: async (_args, ctx) => {
+      await disconnectBrowser();
+      ctx.ui.notify("WebMCP disconnected from Chrome.", "info");
     },
   });
 }
