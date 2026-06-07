@@ -22,6 +22,7 @@ type WebMcpTool = {
 type CdpClient = Client & {
   send(method: string, params?: any, sessionId?: string): Promise<any>;
   on(method: string, cb: (params: any, sessionId?: string) => void): void;
+  once(method: string, cb: (...args: any[]) => void): void;
 };
 
 function safeName(input: string) {
@@ -33,8 +34,28 @@ function toolSchema(schema: any) {
   return schema && typeof schema === "object" ? schema : Type.Object({}, { additionalProperties: true });
 }
 
+let browserClient: CdpClient | undefined;
+const attachedSessions = new Map<string, string>();
+
 async function openBrowser(): Promise<CdpClient> {
-  return await CDP({ target: DEFAULT_WS, local: true }) as CdpClient;
+  if (browserClient) return browserClient;
+  browserClient = await CDP({ target: DEFAULT_WS, local: true }) as CdpClient;
+  const clear = () => {
+    browserClient = undefined;
+    attachedSessions.clear();
+  };
+  browserClient.once?.("disconnect", clear);
+  browserClient.once?.("error", clear);
+  return browserClient;
+}
+
+async function getAttachedSession(cdp: CdpClient, targetId: string): Promise<string> {
+  const existing = attachedSessions.get(targetId);
+  if (existing) return existing;
+  const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
+  attachedSessions.set(targetId, sessionId);
+  await cdp.send("WebMCP.enable", {}, sessionId);
+  return sessionId;
 }
 
 async function getPageTargets(cdp: CdpClient, filter = ""): Promise<TargetInfo[]> {
@@ -50,67 +71,49 @@ async function getPageTargets(cdp: CdpClient, filter = ""): Promise<TargetInfo[]
 async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
   const cdp = await openBrowser();
   const found: WebMcpTool[] = [];
-  try {
-    const targets = await getPageTargets(cdp, filter);
-    for (const target of targets) {
-      let sessionId: string | undefined;
-      try {
-        ({ sessionId } = await cdp.send("Target.attachToTarget", { targetId: target.targetId, flatten: true }));
-        cdp.on("WebMCP.toolsAdded", (ev: any, evSessionId?: string) => {
-          if (evSessionId !== sessionId) return;
-          for (const tool of ev.tools ?? []) {
-            found.push({ targetId: target.targetId, title: target.title, url: target.url, ...tool });
-          }
-        });
-        await cdp.send("WebMCP.enable", {}, sessionId);
-        await new Promise(resolve => setTimeout(resolve, 500));
-      } finally {
-        if (sessionId) await cdp.send("Target.detachFromTarget", { sessionId }).catch(() => { });
+  const targets = await getPageTargets(cdp, filter);
+  for (const target of targets) {
+    const sessionId = await getAttachedSession(cdp, target.targetId);
+    cdp.on("WebMCP.toolsAdded", (ev: any, evSessionId?: string) => {
+      if (evSessionId !== sessionId) return;
+      for (const tool of ev.tools ?? []) {
+        found.push({ targetId: target.targetId, title: target.title, url: target.url, ...tool });
       }
-    }
-    return found;
-  } finally {
-    await cdp.close();
+    });
+    await cdp.send("WebMCP.enable", {}, sessionId);
+    await new Promise(resolve => setTimeout(resolve, 500));
   }
+  return found;
 }
 
 async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
   const cdp = await openBrowser();
-  try {
-    const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: tool.targetId, flatten: true });
-    try {
-      await cdp.send("WebMCP.enable", {}, sessionId);
-      let invocationId: string | undefined;
-      const responsePromise = new Promise<any>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          reject(new Error(
-            "Timed out waiting for WebMCP.toolResponded. The page accepted the invocation but did not respond; declarative form tools may require the page/form to opt into toolautosubmit or otherwise call event.respondWith(...).",
-          ));
-        }, 60_000);
-        cdp.on("WebMCP.toolResponded", (ev: any, evSessionId?: string) => {
-          if (evSessionId !== sessionId) return;
-          if (!invocationId || ev.invocationId === invocationId) {
-            clearTimeout(timer);
-            resolve(ev);
-          }
-        });
-      });
+  const sessionId = await getAttachedSession(cdp, tool.targetId);
+  let invocationId: string | undefined;
+  const responsePromise = new Promise<any>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(
+        "Timed out waiting for WebMCP.toolResponded. The page accepted the invocation but did not respond; declarative form tools may require the page/form to opt into toolautosubmit or otherwise call event.respondWith(...).",
+      ));
+    }, 60_000);
+    cdp.on("WebMCP.toolResponded", (ev: any, evSessionId?: string) => {
+      if (evSessionId !== sessionId) return;
+      if (!invocationId || ev.invocationId === invocationId) {
+        clearTimeout(timer);
+        resolve(ev);
+      }
+    });
+  });
 
-      const invokeResult: any = await cdp.send("WebMCP.invokeTool", {
-        frameId: tool.frameId,
-        toolName: tool.name,
-        input,
-      }, sessionId);
-      invocationId = invokeResult.invocationId;
+  const invokeResult: any = await cdp.send("WebMCP.invokeTool", {
+    frameId: tool.frameId,
+    toolName: tool.name,
+    input,
+  }, sessionId);
+  invocationId = invokeResult.invocationId;
 
-      const response = await responsePromise;
-      return { invokeResult, response };
-    } finally {
-      await cdp.send("Target.detachFromTarget", { sessionId }).catch(() => { });
-    }
-  } finally {
-    await cdp.close();
-  }
+  const response = await responsePromise;
+  return { invokeResult, response };
 }
 
 export default function webMcpExtension(pi: ExtensionAPI) {
