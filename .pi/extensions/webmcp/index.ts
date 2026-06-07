@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import CDP from "chrome-remote-interface";
+import type { Client } from "chrome-remote-interface";
 import { Type } from "typebox";
-import WebSocket from "ws";
 
 const DEFAULT_HOST = process.env.CDP_HOST ?? "127.0.0.1";
 const DEFAULT_PORT = Number(process.env.CDP_PORT ?? 9222);
@@ -18,48 +19,10 @@ type WebMcpTool = {
   [key: string]: any;
 };
 
-class BrowserCDP {
-  private ws?: WebSocket;
-  private id = 0;
-  private pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>();
-  private listeners = new Map<string, Array<(params: any, sessionId?: string) => void>>();
-
-  constructor(private wsUrl: string) { }
-
-  async connect() {
-    this.ws = new WebSocket(this.wsUrl);
-    this.ws.on("message", data => this.onMessage(JSON.parse(String(data))));
-    await new Promise<void>((resolve, reject) => {
-      this.ws!.once("open", () => resolve());
-      this.ws!.once("error", reject);
-    });
-  }
-
-  private onMessage(msg: any) {
-    if (msg.id && this.pending.has(msg.id)) {
-      const pending = this.pending.get(msg.id)!;
-      this.pending.delete(msg.id);
-      if (msg.error) pending.reject(new Error(`${msg.error.message}: ${msg.error.data ?? ""}`));
-      else pending.resolve(msg.result ?? {});
-      return;
-    }
-    for (const cb of this.listeners.get(msg.method) ?? []) cb(msg.params ?? {}, msg.sessionId);
-  }
-
-  send(method: string, params: any = {}, sessionId?: string) {
-    const id = ++this.id;
-    this.ws!.send(JSON.stringify(sessionId ? { id, method, params, sessionId } : { id, method, params }));
-    return new Promise<any>((resolve, reject) => this.pending.set(id, { resolve, reject }));
-  }
-
-  on(method: string, cb: (params: any, sessionId?: string) => void) {
-    const list = this.listeners.get(method) ?? [];
-    list.push(cb);
-    this.listeners.set(method, list);
-  }
-
-  close() { this.ws?.close(); }
-}
+type CdpClient = Client & {
+  send(method: string, params?: any, sessionId?: string): Promise<any>;
+  on(method: string, cb: (params: any, sessionId?: string) => void): void;
+};
 
 function safeName(input: string) {
   return input.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48) || "tool";
@@ -70,13 +33,11 @@ function toolSchema(schema: any) {
   return schema && typeof schema === "object" ? schema : Type.Object({}, { additionalProperties: true });
 }
 
-async function openBrowser() {
-  const cdp = new BrowserCDP(DEFAULT_WS);
-  await cdp.connect();
-  return cdp;
+async function openBrowser(): Promise<CdpClient> {
+  return await CDP({ target: DEFAULT_WS, local: true }) as CdpClient;
 }
 
-async function getPageTargets(cdp: BrowserCDP, filter = ""): Promise<TargetInfo[]> {
+async function getPageTargets(cdp: CdpClient, filter = ""): Promise<TargetInfo[]> {
   const { targetInfos } = await cdp.send("Target.getTargets");
   return (targetInfos as TargetInfo[]).filter(t =>
     t.type === "page" &&
@@ -95,7 +56,7 @@ async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
       let sessionId: string | undefined;
       try {
         ({ sessionId } = await cdp.send("Target.attachToTarget", { targetId: target.targetId, flatten: true }));
-        cdp.on("WebMCP.toolsAdded", (ev, evSessionId) => {
+        cdp.on("WebMCP.toolsAdded", (ev: any, evSessionId?: string) => {
           if (evSessionId !== sessionId) return;
           for (const tool of ev.tools ?? []) {
             found.push({ targetId: target.targetId, title: target.title, url: target.url, ...tool });
@@ -109,7 +70,7 @@ async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
     }
     return found;
   } finally {
-    cdp.close();
+    await cdp.close();
   }
 }
 
@@ -119,7 +80,7 @@ async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
     const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: tool.targetId, flatten: true });
     try {
       await cdp.send("WebMCP.enable", {}, sessionId);
-      const invokeResult = await cdp.send("WebMCP.invokeTool", {
+      const invokeResult: any = await cdp.send("WebMCP.invokeTool", {
         frameId: tool.frameId,
         toolName: tool.name,
         input,
@@ -128,7 +89,7 @@ async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
       const invocationId = invokeResult.invocationId;
       const response = await new Promise<any>((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error("Timed out waiting for WebMCP.toolResponded")), 60_000);
-        cdp.on("WebMCP.toolResponded", (ev, evSessionId) => {
+        cdp.on("WebMCP.toolResponded", (ev: any, evSessionId?: string) => {
           if (evSessionId !== sessionId) return;
           if (!invocationId || ev.invocationId === invocationId) {
             clearTimeout(timer);
@@ -141,7 +102,7 @@ async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
       await cdp.send("Target.detachFromTarget", { sessionId }).catch(() => { });
     }
   } finally {
-    cdp.close();
+    await cdp.close();
   }
 }
 

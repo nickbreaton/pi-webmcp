@@ -1,12 +1,16 @@
 {
   "type": "module",
   "scripts": {
-    "webmcp:list": "node scripts/webmcp-cdp.mjs list",
-    "webmcp:watch": "node scripts/webmcp-cdp.mjs watch",
-    "webmcp:call": "node scripts/webmcp-cdp.mjs call"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "chrome-remote-interface": "^0.33.3",
-    "ws": "^8.21.0"
+    "typebox": "^1.2.1"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "^0.78.1",
+    "@types/chrome-remote-interface": "^0.34.0",
+    "@types/node": "^25.9.2",
+    "typescript": "^6.0.3"
   }
 }
