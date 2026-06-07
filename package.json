@@ -1,16 +1,34 @@
 {
+  "name": "pi-webmcp",
+  "version": "0.1.0",
   "type": "module",
+  "license": "MIT",
+  "description": "Pi extension that discovers WebMCP tools in open Chrome tabs and registers them as pi tools.",
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "webmcp"
+  ],
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "chrome-remote-interface": "^0.33.3",
-    "typebox": "^1.2.1"
+    "chrome-remote-interface": "^0.33.3"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.78.1",
     "@types/chrome-remote-interface": "^0.34.0",
     "@types/node": "^25.9.2",
+    "typebox": "^1.2.1",
     "typescript": "^6.0.3"
+  },
+  "pi": {
+    "extensions": [
+      ".pi/extensions/webmcp/index.ts"
+    ]
   }
 }
