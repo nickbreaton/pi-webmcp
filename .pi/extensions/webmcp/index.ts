@@ -178,8 +178,4 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       }
     },
   });
-
-  pi.on("session_start", (_event, ctx) => {
-    ctx.ui.notify("WebMCP extension loaded. Run /webmcp-scan or call webmcp_scan_tools.", "info");
-  });
 }
