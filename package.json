@@ -1,0 +1,12 @@
+{
+  "type": "module",
+  "scripts": {
+    "webmcp:list": "node scripts/webmcp-cdp.mjs list",
+    "webmcp:watch": "node scripts/webmcp-cdp.mjs watch",
+    "webmcp:call": "node scripts/webmcp-cdp.mjs call"
+  },
+  "dependencies": {
+    "chrome-remote-interface": "^0.33.3",
+    "ws": "^8.21.0"
+  }
+}
