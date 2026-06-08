@@ -1,4 +1,4 @@
-import { keyText, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { keyHint, keyText, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
 import CDP from "chrome-remote-interface";
 import type { Client } from "chrome-remote-interface";
@@ -203,6 +203,23 @@ function renderExecuteResult(result: { content?: Array<{ type: string; text?: st
   return new Text(text, 0, 0);
 }
 
+const initializedDiscoveryMessages = new WeakSet<object>();
+
+function renderDiscoveryMessage(message: { details?: { tools?: WebMcpTool[] } }, { expanded }: { expanded: boolean }, theme: any) {
+  const tools = message.details?.tools ?? [];
+  const initialized = initializedDiscoveryMessages.has(message);
+  if (!initialized) initializedDiscoveryMessages.add(message);
+  const showDetails = initialized && expanded;
+
+  let text = theme.fg("toolTitle", theme.bold(`WebMCP scanned: ${tools.length} tool(s) found`));
+  if (!showDetails) {
+    text += ` ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`;
+    return new Text(text, 0, 0);
+  }
+  text += `\n\n${listToolsText(tools)}`;
+  return new Text(text, 0, 0);
+}
+
 function listToolsText(tools: WebMcpTool[]) {
   if (tools.length === 0) return "No WebMCP tools found. Use webmcp_list({ filter: \"optional filter\" }) to scan open Chrome tabs.";
   const byOrigin = new Map<string, WebMcpTool[]>();
@@ -211,15 +228,20 @@ function listToolsText(tools: WebMcpTool[]) {
     group.push(tool);
     byOrigin.set(tool.origin, group);
   }
-  const lines: string[] = [];
+  const groups: string[] = [];
   for (const [origin, originTools] of [...byOrigin.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    lines.push(`${origin}:`);
+    const lines: string[] = [`${origin}:`];
     for (const tool of originTools.sort((a, b) => a.name.localeCompare(b.name))) {
-      lines.push(`  - ${toolId(tool)} (${tool.name}) @ ${tool.title}`);
-      if (tool.description) lines.push(`    ${tool.description}`);
+      const id = toolId(tool);
+      const name = id === tool.name ? id : `${id} (${tool.name})`;
+      const parts = [`  - ${name}`];
+      if (tool.title) parts.push(`@ ${tool.title}`);
+      if (tool.description) parts.push(`\n    ${tool.description}`);
+      lines.push(parts.join(" "));
     }
+    groups.push(lines.join("\n\n"));
   }
-  return lines.join("\n");
+  return groups.join("\n\n");
 }
 
 export default function webMcpExtension(pi: ExtensionAPI) {
@@ -229,18 +251,24 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     await disconnectBrowser();
   });
 
+  pi.registerMessageRenderer?.("webmcp-discovery", renderDiscoveryMessage);
+
   function hiddenDiscoveryMessage(tools: WebMcpTool[]) {
     if (tools.length === 0) return;
     pi.sendMessage?.({
       customType: "webmcp-discovery",
-      content: `New WebMCP tool(s) discovered:\n${listToolsText(tools)}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
-      display: false,
+      content: "Use webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.",
+      display: true,
+      details: { tools },
     }, { triggerTurn: false, deliverAs: "steer" });
   }
+
+  let lastScanNewCount = 0;
 
   async function scanAndStore(filter = "", announce = false) {
     const tools = await scanWebMcpTools(filter);
     const newTools = tools.filter(tool => !registry.has(registryKey(tool)));
+    lastScanNewCount = newTools.length;
     upsertTools(registry, tools);
     if (announce) hiddenDiscoveryMessage(newTools);
     return tools;
@@ -354,7 +382,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       try {
         const tools = await scanAndStore(args.trim(), true);
-        ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s).`, "info");
+        if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
       } catch (err: any) {
         ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
       }
