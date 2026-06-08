@@ -1,7 +1,7 @@
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { keyText, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import CDP from "chrome-remote-interface";
 import type { Client } from "chrome-remote-interface";
-import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 
 const DEFAULT_HOST = process.env.CDP_HOST ?? "127.0.0.1";
@@ -41,7 +41,11 @@ function originName(url: string) {
 }
 
 function toolId(tool: WebMcpTool) {
-  return `${safeName(tool.origin)}__${safeName(tool.name)}`;
+  return safeName(tool.name);
+}
+
+function registryKey(tool: WebMcpTool) {
+  return `${tool.origin}::${tool.frameId}::${tool.name}`;
 }
 
 function formatSchema(schema: any, indent = 2): string {
@@ -166,12 +170,37 @@ async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
 
 function upsertTools(registry: Map<string, WebMcpTool>, tools: WebMcpTool[]) {
   for (const tool of tools) {
-    registry.set(toolId(tool), tool);
+    registry.set(registryKey(tool), tool);
   }
 }
 
-function hiddenToolRender() {
+function renderToolCall(toolName: string, args: { tool?: string; origin?: string }, theme: any, includeExpandHint = false) {
+  const origin = args.origin ? theme.fg("accent", args.origin) : theme.fg("dim", "unknown origin");
+  const tool = args.tool ? theme.fg("toolOutput", args.tool) : theme.fg("dim", "unknown tool");
+  let text = `${theme.fg("toolTitle", theme.bold(toolName))} ${origin} ${theme.fg("dim", "→")} ${tool}`;
+  if (includeExpandHint) text += `\n\n${theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`)}`;
+  return new Text(text, 0, 0);
+}
+
+function renderExecuteCall(args: { tool?: string; origin?: string }, theme: any) {
+  return renderToolCall("webmcp_execute", args, theme, true);
+}
+
+function renderDescribeCall(args: { tool?: string; origin?: string }, theme: any) {
+  return renderToolCall("webmcp_describe", args, theme);
+}
+
+function renderDescribeResult(_result: unknown) {
   return new Text("", 0, 0);
+}
+
+function renderExecuteResult(result: { content?: Array<{ type: string; text?: string }>; details?: any }, { expanded, isPartial }: { expanded: boolean; isPartial: boolean }, theme: any) {
+  if (isPartial) return new Text(theme.fg("warning", "WebMCP executing..."), 0, 0);
+
+  if (!expanded) return new Text("", 0, 0);
+
+  const text = result.content?.find(c => c.type === "text")?.text ?? JSON.stringify(result.details?.result?.response ?? result.details ?? {}, null, 2);
+  return new Text(text, 0, 0);
 }
 
 function listToolsText(tools: WebMcpTool[]) {
@@ -211,7 +240,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   async function scanAndStore(filter = "", announce = false) {
     const tools = await scanWebMcpTools(filter);
-    const newTools = tools.filter(tool => !registry.has(toolId(tool)));
+    const newTools = tools.filter(tool => !registry.has(registryKey(tool)));
     upsertTools(registry, tools);
     if (announce) hiddenDiscoveryMessage(newTools);
     return tools;
@@ -237,8 +266,6 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter for scanning open tabs." })),
       refresh: Type.Optional(Type.Boolean({ description: "Force a new scan even if tools are already known. Default: true." })),
     }),
-    renderCall: hiddenToolRender,
-    renderResult: hiddenToolRender,
     async execute(_toolCallId, params) {
       if (params.refresh !== false || registry.size === 0) await scanAndStore(params.filter ?? "", true);
       const tools = [...registry.values()].filter(t =>
@@ -252,24 +279,24 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     name: "webmcp_describe",
     label: "WebMCP Describe",
     description: "Describe a WebMCP tool's page, origin, description, and input parameters.",
-    promptSnippet: "Inspect a WebMCP page tool schema before executing it",
+    promptSnippet: "Inspect a WebMCP page tool schema before executing it; pass the origin from webmcp_list",
     promptGuidelines: [
-      "Use webmcp_describe when you need a WebMCP tool's exact parameters before execution.",
+      "Use webmcp_describe with both tool and origin from webmcp_list when you need a WebMCP tool's exact parameters before execution.",
     ],
     parameters: Type.Object({
       tool: Type.String({ description: "Tool id from webmcp_list, or the page-provided tool name." }),
-      origin: Type.Optional(Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." })),
+      origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
     }),
-    renderCall: hiddenToolRender,
-    renderResult: hiddenToolRender,
-    async execute(_toolCallId: string, params: { tool: string; origin?: string }) {
+    renderCall: renderDescribeCall,
+    renderResult: renderDescribeResult,
+    async execute(_toolCallId: string, params: { tool: string; origin: string }) {
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
         return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates } };
       }
       const id = toolId(resolved);
-      const text = `${id}\nOrigin: ${resolved.origin}\nName: ${resolved.name}\nPage: ${resolved.title}\nURL: ${resolved.url}\n\n${resolved.description ?? "(no description)"}\n\nParameters:\n${formatSchema(resolved.inputSchema)}`;
+      const text = `${resolved.description ?? "(no description)"}\n\nParameters:\n${formatSchema(resolved.inputSchema)}`;
       return { content: [{ type: "text" as const, text }], details: { tool: resolved, id } };
     },
   });
@@ -288,6 +315,8 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
       args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
     }),
+    renderCall: renderExecuteCall,
+    renderResult: renderExecuteResult,
     async execute(_toolCallId: string, params: { tool: string; origin: string; args?: string }) {
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
@@ -312,8 +341,6 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     label: "WebMCP Disconnect",
     description: "Disconnect from Chrome remote debugging and clear known WebMCP tools.",
     parameters: Type.Object({}),
-    renderCall: hiddenToolRender,
-    renderResult: hiddenToolRender,
     async execute() {
       await disconnectBrowser();
       registry.clear();
