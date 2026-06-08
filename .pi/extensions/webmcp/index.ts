@@ -194,6 +194,16 @@ function renderDescribeResult(_result: unknown) {
   return new Text("", 0, 0);
 }
 
+function renderListCall(_args: { filter?: string }, theme: any) {
+  return new Text(`${theme.fg("toolTitle", theme.bold("webmcp_list"))} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`, 0, 0);
+}
+
+function renderListResult(result: { content?: Array<{ type: string; text?: string }> }, { expanded, isPartial }: { expanded: boolean; isPartial: boolean }, theme: any) {
+  if (isPartial) return new Text(theme.fg("warning", "WebMCP scanning..."), 0, 0);
+  if (!expanded) return new Text("", 0, 0);
+  return new Text(result.content?.find(c => c.type === "text")?.text ?? "", 0, 0);
+}
+
 function renderExecuteResult(result: { content?: Array<{ type: string; text?: string }>; details?: any }, { expanded, isPartial }: { expanded: boolean; isPartial: boolean }, theme: any) {
   if (isPartial) return new Text(theme.fg("warning", "WebMCP executing..."), 0, 0);
 
@@ -294,6 +304,8 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter for scanning open tabs." })),
       refresh: Type.Optional(Type.Boolean({ description: "Force a new scan even if tools are already known. Default: true." })),
     }),
+    renderCall: renderListCall,
+    renderResult: renderListResult,
     async execute(_toolCallId, params) {
       if (params.refresh !== false || registry.size === 0) await scanAndStore(params.filter ?? "", true);
       const tools = [...registry.values()].filter(t =>
