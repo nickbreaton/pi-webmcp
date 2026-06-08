@@ -329,9 +329,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("args must be a JSON object string");
       }
       const result = await invokeWebMcpTool(resolved, input);
+      const text = `\nInput:\n${JSON.stringify(input, null, 2)}\n\nResponse:\n${JSON.stringify(result.response, null, 2)}`;
       return {
-        content: [{ type: "text" as const, text: JSON.stringify(result.response, null, 2) }],
-        details: { id: toolId(resolved), origin: resolved.origin, tool: resolved, result },
+        content: [{ type: "text" as const, text }],
+        details: { id: toolId(resolved), origin: resolved.origin, tool: resolved, input, result },
       };
     },
   });
