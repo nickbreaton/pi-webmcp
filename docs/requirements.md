@@ -16,7 +16,7 @@ The connection should be explicit by default. Browser tools should not become av
 The user runs:
 
 ```text
-/webmcp connect
+/webmcp-connect
 ```
 
 When this happens:
@@ -32,7 +32,7 @@ When this happens:
 The user runs:
 
 ```text
-/webmcp disconnect
+/webmcp-disconnect
 ```
 
 When this happens:
@@ -49,13 +49,13 @@ Ideally, Pi should expose the relevant command based on connection state.
 When disconnected, show:
 
 ```text
-/webmcp connect
+/webmcp-connect
 ```
 
 When connected, show:
 
 ```text
-/webmcp disconnect
+/webmcp-disconnect
 ```
 
 If conditional command visibility is not supported, a single toggle-style command could be considered, but explicit connect/disconnect commands are preferred.
@@ -77,7 +77,7 @@ Off
 When Auto-Connect is off:
 
 1. Pi does not connect to WebMCP automatically.
-2. The user must explicitly run `/webmcp connect`.
+2. The user must explicitly run `/webmcp-connect`.
 
 When Auto-Connect is on:
 
@@ -180,8 +180,8 @@ Open implementation questions:
 
 ## 11. Requirements Summary
 
-1. WebMCP connection is initiated with `/webmcp connect`.
-2. WebMCP disconnection is initiated with `/webmcp disconnect`.
+1. WebMCP connection is initiated with `/webmcp-connect`.
+2. WebMCP disconnection is initiated with `/webmcp-disconnect`.
 3. Browser tools should only be available after WebMCP connects.
 4. Browser tools should be unavailable after WebMCP disconnects.
 5. Auto-Connect may connect automatically only when the user has opted in.

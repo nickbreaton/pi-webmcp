@@ -186,14 +186,14 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("webmcp-scan", {
-    description: "Scan Chrome for WebMCP tools and register them as pi tools",
+  pi.registerCommand("webmcp-connect", {
+    description: "Connect to Chrome WebMCP and register available page tools",
     handler: async (args, ctx) => {
       try {
         const tools = await registerDiscovered(args.trim(), msg => ctx.ui.notify(msg, "info"));
-        ctx.ui.notify(`WebMCP scan complete: ${tools.length} tool(s).`, "info");
+        ctx.ui.notify(`WebMCP connected: ${tools.length} tool(s).`, "info");
       } catch (err: any) {
-        ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
+        ctx.ui.notify(`WebMCP connect failed: ${err.message ?? err}`, "error");
       }
     },
   });
