@@ -30,6 +30,15 @@ function safeName(input: string) {
   return input.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48) || "tool";
 }
 
+function originName(url: string) {
+  try {
+    const parsed = new URL(url);
+    return safeName(parsed.host);
+  } catch {
+    return safeName(url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split("/")[0]);
+  }
+}
+
 function toolSchema(schema: any) {
   // WebMCP schemas are JSON Schema-shaped and generally compatible enough for pi's TypeBox validator.
   return schema && typeof schema === "object" ? schema : Type.Object({}, { additionalProperties: true });
@@ -142,7 +151,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   async function registerDiscovered(filter = "", notify?: (msg: string) => void) {
     const tools = await scanWebMcpTools(filter);
     for (const tool of tools) {
-      const base = `webmcp_${safeName(tool.name)}`;
+      const base = `${originName(tool.url)}__${safeName(tool.name)}`;
       let name = base;
       let i = 2;
       while (registered.has(name) && registry.get(name)?.targetId !== tool.targetId) name = `${base}_${i++}`;
