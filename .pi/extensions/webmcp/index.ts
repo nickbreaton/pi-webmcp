@@ -502,9 +502,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       const trimmed = prefix.trimStart();
       if (trimmed.includes(" ")) return null;
 
-      const commands = browserClient
-        ? [{ value: "disconnect", label: "disconnect", detail: "Disconnect from Chrome WebMCP" }]
-        : [{ value: "connect", label: "connect", detail: "Scan Chrome WebMCP tools" }];
+      const commands = [
+        { value: "connect", label: "connect", detail: "Scan Chrome WebMCP tools" },
+        { value: "disconnect", label: "disconnect", detail: "Disconnect from Chrome WebMCP" },
+      ];
       const filtered = commands.filter(command => command.value.startsWith(trimmed));
       return filtered.length > 0 ? filtered : null;
     },
