@@ -454,24 +454,40 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
   });
 
-  pi.registerCommand("webmcp-connect", {
-    description: "Scan Chrome WebMCP tools",
+  pi.registerCommand("webmcp", {
+    description: "Connect to or disconnect from Chrome WebMCP tools",
+    getArgumentCompletions: (prefix: string) => {
+      const trimmed = prefix.trimStart();
+      if (trimmed.includes(" ")) return null;
+
+      const commands = browserClient
+        ? [{ value: "disconnect", label: "disconnect", detail: "Disconnect from Chrome WebMCP" }]
+        : [{ value: "connect", label: "connect", detail: "Scan Chrome WebMCP tools" }];
+      const filtered = commands.filter(command => command.value.startsWith(trimmed));
+      return filtered.length > 0 ? filtered : null;
+    },
     handler: async (args, ctx) => {
+      const [subcommand = "connect", ...rest] = args.trim().split(/\s+/).filter(Boolean);
+      const normalized = subcommand.toLowerCase();
+
+      if (normalized === "disconnect") {
+        await disconnectBrowser();
+        registry.clear();
+        ctx.ui.notify("WebMCP disconnected from Chrome.", "info");
+        return;
+      }
+
+      if (normalized !== "connect") {
+        ctx.ui.notify("Usage: /webmcp [connect|disconnect]", "error");
+        return;
+      }
+
       try {
-        const tools = await scanAndStore(args.trim(), true);
+        const tools = await scanAndStore(rest.join(" "), true);
         if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
       } catch (err: any) {
         ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
       }
-    },
-  });
-
-  pi.registerCommand("webmcp-disconnect", {
-    description: "Disconnect pi from Chrome's remote debugging session",
-    handler: async (_args, ctx) => {
-      await disconnectBrowser();
-      registry.clear();
-      ctx.ui.notify("WebMCP disconnected from Chrome.", "info");
     },
   });
 }
