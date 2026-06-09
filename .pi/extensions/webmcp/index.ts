@@ -266,7 +266,18 @@ function listToolsText(tools: WebMcpTool[]) {
 
 export default function webMcpExtension(pi: ExtensionAPI) {
   const registry = new Map<string, WebMcpTool>();
+  const sentToolKeys = new Set<string>();
   let monitoring = false;
+  let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
+  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean } | undefined;
+
+  function unsentTools() {
+    return [...registry.values()].filter(tool => !sentToolKeys.has(registryKey(tool)));
+  }
+
+  function markToolsSent(tools: WebMcpTool[]) {
+    for (const tool of tools) sentToolKeys.add(registryKey(tool));
+  }
 
   pi.on("session_shutdown", async () => {
     await disconnectBrowser();
@@ -278,16 +289,27 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     if (tools.length === 0) return;
     pi.sendMessage?.({
       customType: "webmcp-discovery",
-      content: `Discovered WebMCP tools:\n\n${listToolsText(tools)}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
+      content: `Discovered WebMCP tools:\n\n${listToolsText(tools)}\n\nThese tools will be provided to the LLM on the next user message. Use webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
       display: true,
       details: { tools },
-    }, { triggerTurn: false, deliverAs: "steer" });
+    }, { triggerTurn: false, deliverAs: "nextTurn" });
+    markToolsSent(tools);
   }
 
   let lastScanNewCount = 0;
 
-  function announceTools(tools: WebMcpTool[]) {
-    hiddenDiscoveryMessage(tools);
+  function scheduleDiscoveryAnnouncement(ctx = lastCtx) {
+    if (ctx) lastCtx = ctx;
+    if (pendingDiscoveryCheck) return;
+    pendingDiscoveryCheck = setTimeout(() => {
+      pendingDiscoveryCheck = undefined;
+      const currentCtx = ctx ?? lastCtx;
+      if (currentCtx && (!currentCtx.isIdle() || currentCtx.hasPendingMessages())) {
+        scheduleDiscoveryAnnouncement(currentCtx);
+        return;
+      }
+      hiddenDiscoveryMessage(unsentTools());
+    }, 250);
   }
 
   async function attachMonitorTarget(target: TargetInfo) {
@@ -323,7 +345,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         if (!registry.has(registryKey(webMcpTool))) newTools.push(webMcpTool);
       }
       upsertTools(registry, newTools);
-      announceTools(newTools);
+      scheduleDiscoveryAnnouncement();
     });
 
     cdp.on("Target.targetCreated", ({ targetInfo }: { targetInfo?: TargetInfo }) => {
@@ -346,8 +368,28 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     lastScanNewCount = newTools.length;
     upsertTools(registry, tools);
     if (announce) hiddenDiscoveryMessage(newTools);
+    else scheduleDiscoveryAnnouncement();
     return tools;
   }
+
+  pi.on("agent_end", async (_event, ctx) => {
+    lastCtx = ctx;
+    scheduleDiscoveryAnnouncement(ctx);
+  });
+
+  pi.on("before_agent_start", async () => {
+    const tools = unsentTools();
+    if (tools.length === 0) return;
+    markToolsSent(tools);
+    return {
+      message: {
+        customType: "webmcp-discovery",
+        content: `New WebMCP tools discovered since the LLM was last informed:\n\n${listToolsText(tools)}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
+        display: false,
+        details: { tools },
+      },
+    };
+  });
 
   const resolveTool = (name: string, origin?: string) => {
     const candidates = [...registry.values()].filter(t =>
