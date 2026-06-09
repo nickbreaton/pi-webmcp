@@ -63,6 +63,8 @@ function formatSchema(schema: any, indent = 2): string {
 
 let browserClient: CdpClient | undefined;
 const attachedSessions = new Map<string, string>();
+const targetInfoById = new Map<string, TargetInfo>();
+const targetIdBySession = new Map<string, string>();
 
 async function openBrowser(): Promise<CdpClient> {
   if (browserClient) return browserClient;
@@ -70,6 +72,8 @@ async function openBrowser(): Promise<CdpClient> {
   const clear = () => {
     browserClient = undefined;
     attachedSessions.clear();
+    targetInfoById.clear();
+    targetIdBySession.clear();
   };
   browserClient.once?.("disconnect", clear);
   browserClient.once?.("error", clear);
@@ -82,6 +86,8 @@ async function disconnectBrowser(): Promise<void> {
 
   const sessions = [...attachedSessions.values()];
   attachedSessions.clear();
+  targetInfoById.clear();
+  targetIdBySession.clear();
   browserClient = undefined;
 
   await Promise.allSettled(
@@ -95,17 +101,21 @@ async function getAttachedSession(cdp: CdpClient, targetId: string): Promise<str
   if (existing) return existing;
   const { sessionId } = await cdp.send("Target.attachToTarget", { targetId, flatten: true });
   attachedSessions.set(targetId, sessionId);
+  targetIdBySession.set(sessionId, targetId);
   await cdp.send("WebMCP.enable", {}, sessionId);
   return sessionId;
 }
 
 async function getPageTargets(cdp: CdpClient, filter = ""): Promise<TargetInfo[]> {
   const { targetInfos } = await cdp.send("Target.getTargets");
-  return (targetInfos as TargetInfo[]).filter(t =>
+  const pages = (targetInfos as TargetInfo[]).filter(t =>
     t.type === "page" &&
     !t.url.startsWith("chrome://") &&
-    !t.url.startsWith("devtools://") &&
-    (!filter || t.url.includes(filter) || t.title?.includes(filter) || t.targetId === filter)
+    !t.url.startsWith("devtools://")
+  );
+  for (const target of pages) targetInfoById.set(target.targetId, target);
+  return pages.filter(t =>
+    !filter || t.url.includes(filter) || t.title?.includes(filter) || t.targetId === filter
   );
 }
 
@@ -256,6 +266,7 @@ function listToolsText(tools: WebMcpTool[]) {
 
 export default function webMcpExtension(pi: ExtensionAPI) {
   const registry = new Map<string, WebMcpTool>();
+  let monitoring = false;
 
   pi.on("session_shutdown", async () => {
     await disconnectBrowser();
@@ -267,7 +278,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     if (tools.length === 0) return;
     pi.sendMessage?.({
       customType: "webmcp-discovery",
-      content: "Use webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.",
+      content: `Discovered WebMCP tools:\n\n${listToolsText(tools)}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
       display: true,
       details: { tools },
     }, { triggerTurn: false, deliverAs: "steer" });
@@ -275,8 +286,62 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   let lastScanNewCount = 0;
 
+  function announceTools(tools: WebMcpTool[]) {
+    hiddenDiscoveryMessage(tools);
+  }
+
+  async function attachMonitorTarget(target: TargetInfo) {
+    targetInfoById.set(target.targetId, target);
+    try {
+      await getAttachedSession(await openBrowser(), target.targetId);
+    } catch {
+      // The tab may have closed between discovery and attach.
+    }
+  }
+
+  async function startToolMonitor() {
+    if (monitoring) return;
+    monitoring = true;
+    const cdp = await openBrowser();
+
+    cdp.on("WebMCP.toolsAdded", (ev: any, evSessionId?: string) => {
+      if (!evSessionId) return;
+      const targetId = targetIdBySession.get(evSessionId);
+      if (!targetId) return;
+      const target = targetInfoById.get(targetId);
+      if (!target) return;
+
+      const newTools: WebMcpTool[] = [];
+      for (const tool of ev.tools ?? []) {
+        const webMcpTool = {
+          targetId,
+          title: target.title,
+          url: target.url,
+          origin: originName(target.url),
+          ...tool,
+        };
+        if (!registry.has(registryKey(webMcpTool))) newTools.push(webMcpTool);
+      }
+      upsertTools(registry, newTools);
+      announceTools(newTools);
+    });
+
+    cdp.on("Target.targetCreated", ({ targetInfo }: { targetInfo?: TargetInfo }) => {
+      if (!targetInfo || targetInfo.type !== "page" || targetInfo.url.startsWith("chrome://") || targetInfo.url.startsWith("devtools://")) return;
+      void attachMonitorTarget(targetInfo);
+    });
+    cdp.on("Target.targetInfoChanged", ({ targetInfo }: { targetInfo?: TargetInfo }) => {
+      if (!targetInfo || targetInfo.type !== "page") return;
+      targetInfoById.set(targetInfo.targetId, targetInfo);
+    });
+    await cdp.send("Target.setDiscoverTargets", { discover: true });
+    await Promise.all((await getPageTargets(cdp)).map(attachMonitorTarget));
+  }
+
+
   async function scanAndStore(filter = "", announce = false) {
     const tools = await scanWebMcpTools(filter);
+    await startToolMonitor();
     const newTools = tools.filter(tool => !registry.has(registryKey(tool)));
     lastScanNewCount = newTools.length;
     upsertTools(registry, tools);
