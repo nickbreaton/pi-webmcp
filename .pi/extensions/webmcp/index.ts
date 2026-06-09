@@ -266,18 +266,45 @@ function listToolsText(tools: WebMcpTool[]) {
 
 export default function webMcpExtension(pi: ExtensionAPI) {
   const registry = new Map<string, WebMcpTool>();
-  const sentToolKeys = new Set<string>();
+  let llmKnownTools = new Map<string, WebMcpTool>();
+  let notifiedDiffSignature = "";
   let monitoring = false;
   let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
-  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean } | undefined;
+  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void } } | undefined;
 
-  function unsentTools() {
-    return [...registry.values()].filter(tool => !sentToolKeys.has(registryKey(tool)));
+  function toolDiff() {
+    const currentKeys = new Set(registry.keys());
+    const added = [...registry.entries()].filter(([key]) => !llmKnownTools.has(key)).map(([, tool]) => tool);
+    const removed = [...llmKnownTools.entries()].filter(([key]) => !currentKeys.has(key)).map(([, tool]) => tool);
+    return { added, removed };
   }
 
-  function markToolsSent(tools: WebMcpTool[]) {
-    for (const tool of tools) sentToolKeys.add(registryKey(tool));
+  function diffSignature(diff = toolDiff()) {
+    return [
+      ...diff.added.map(tool => `+${registryKey(tool)}`),
+      ...diff.removed.map(tool => `-${registryKey(tool)}`),
+    ].sort().join("\n");
   }
+
+  function rememberLlmToolState() {
+    llmKnownTools = new Map(registry);
+    notifiedDiffSignature = "";
+  }
+
+  function removeToolsForTarget(targetId: string) {
+    let changed = false;
+    for (const [key, tool] of registry) {
+      if (tool.targetId === targetId) {
+        registry.delete(key);
+        changed = true;
+      }
+    }
+    if (changed) scheduleDiscoveryAnnouncement();
+  }
+
+  pi.on("session_start", async (_event, ctx) => {
+    lastCtx = ctx;
+  });
 
   pi.on("session_shutdown", async () => {
     await disconnectBrowser();
@@ -285,15 +312,17 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   pi.registerMessageRenderer?.("webmcp-discovery", renderDiscoveryMessage);
 
-  function hiddenDiscoveryMessage(tools: WebMcpTool[]) {
-    if (tools.length === 0) return;
-    pi.sendMessage?.({
-      customType: "webmcp-discovery",
-      content: `Discovered WebMCP tools:\n\n${listToolsText(tools)}\n\nThese tools will be provided to the LLM on the next user message. Use webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
-      display: true,
-      details: { tools },
-    }, { triggerTurn: false, deliverAs: "nextTurn" });
-    markToolsSent(tools);
+  function notifyDiscoveryDiff(ctx = lastCtx) {
+    if (!ctx) return;
+    const diff = toolDiff();
+    if (diff.added.length === 0 && diff.removed.length === 0) return;
+    const signature = diffSignature(diff);
+    if (signature === notifiedDiffSignature) return;
+    notifiedDiffSignature = signature;
+    const parts = [];
+    if (diff.added.length > 0) parts.push(`${diff.added.length} new`);
+    if (diff.removed.length > 0) parts.push(`${diff.removed.length} removed`);
+    ctx.ui.notify(`WebMCP tools changed (${parts.join(", ")}). The next message will include updated tool context.`, "info");
   }
 
   let lastScanNewCount = 0;
@@ -308,7 +337,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         scheduleDiscoveryAnnouncement(currentCtx);
         return;
       }
-      hiddenDiscoveryMessage(unsentTools());
+      notifyDiscoveryDiff(currentCtx);
     }, 250);
   }
 
@@ -348,13 +377,41 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       scheduleDiscoveryAnnouncement();
     });
 
+    cdp.on("WebMCP.toolsRemoved", (ev: any, evSessionId?: string) => {
+      if (!evSessionId) return;
+      const targetId = targetIdBySession.get(evSessionId);
+      if (!targetId) return;
+      const target = targetInfoById.get(targetId);
+      if (!target) return;
+      const removedNames = new Set((ev.tools ?? ev.toolNames ?? []).map((tool: any) => typeof tool === "string" ? tool : tool?.name));
+      if (removedNames.size === 0) return;
+      let changed = false;
+      for (const [key, tool] of registry) {
+        if (tool.targetId === targetId && removedNames.has(tool.name)) {
+          registry.delete(key);
+          changed = true;
+        }
+      }
+      if (changed) scheduleDiscoveryAnnouncement();
+    });
+
     cdp.on("Target.targetCreated", ({ targetInfo }: { targetInfo?: TargetInfo }) => {
       if (!targetInfo || targetInfo.type !== "page" || targetInfo.url.startsWith("chrome://") || targetInfo.url.startsWith("devtools://")) return;
       void attachMonitorTarget(targetInfo);
     });
     cdp.on("Target.targetInfoChanged", ({ targetInfo }: { targetInfo?: TargetInfo }) => {
       if (!targetInfo || targetInfo.type !== "page") return;
+      const previous = targetInfoById.get(targetInfo.targetId);
+      if (previous && previous.url !== targetInfo.url) removeToolsForTarget(targetInfo.targetId);
       targetInfoById.set(targetInfo.targetId, targetInfo);
+    });
+    cdp.on("Target.targetDestroyed", ({ targetId }: { targetId?: string }) => {
+      if (!targetId) return;
+      removeToolsForTarget(targetId);
+      const sessionId = attachedSessions.get(targetId);
+      if (sessionId) targetIdBySession.delete(sessionId);
+      attachedSessions.delete(targetId);
+      targetInfoById.delete(targetId);
     });
     await cdp.send("Target.setDiscoverTargets", { discover: true });
     await Promise.all((await getPageTargets(cdp)).map(attachMonitorTarget));
@@ -367,7 +424,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     const newTools = tools.filter(tool => !registry.has(registryKey(tool)));
     lastScanNewCount = newTools.length;
     upsertTools(registry, tools);
-    if (announce) hiddenDiscoveryMessage(newTools);
+    if (announce) scheduleDiscoveryAnnouncement();
     else scheduleDiscoveryAnnouncement();
     return tools;
   }
@@ -378,15 +435,18 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   });
 
   pi.on("before_agent_start", async () => {
-    const tools = unsentTools();
-    if (tools.length === 0) return;
-    markToolsSent(tools);
+    const diff = toolDiff();
+    if (diff.added.length === 0 && diff.removed.length === 0) return;
+    rememberLlmToolState();
+    const removedText = diff.removed.length > 0
+      ? `\n\nRemoved WebMCP tools (no longer available):\n${listToolsText(diff.removed)}`
+      : "";
     return {
       message: {
         customType: "webmcp-discovery",
-        content: `New WebMCP tools discovered since the LLM was last informed:\n\n${listToolsText(tools)}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke a tool.`,
+        content: `WebMCP tool state changed since the LLM was last informed.\n\nNew WebMCP tools:\n\n${listToolsText(diff.added)}${removedText}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke an available tool.`,
         display: false,
-        details: { tools },
+        details: { added: diff.added, removed: diff.removed },
       },
     };
   });
@@ -526,7 +586,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       }
 
       try {
+        lastCtx = ctx;
         const tools = await scanAndStore(rest.join(" "), true);
+        notifyDiscoveryDiff(ctx);
         if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
       } catch (err: any) {
         ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
