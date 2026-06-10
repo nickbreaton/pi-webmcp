@@ -260,7 +260,7 @@ function discoveryDisplayText(diff: { added?: WebMcpTool[]; removed?: WebMcpTool
 function renderDiscoveryMessage(message: { details?: { tools?: WebMcpTool[]; added?: WebMcpTool[]; removed?: WebMcpTool[] } }, { expanded }: { expanded: boolean }, theme: any) {
   const initialized = initializedDiscoveryMessages.has(message);
   if (!initialized) initializedDiscoveryMessages.add(message);
-  return new Text(discoveryDisplayText(message.details ?? {}, initialized && expanded, theme), 0, 0);
+  return new Text(discoveryDisplayText(message.details ?? {}, initialized && expanded, theme), 1, 0);
 }
 
 function listToolsText(tools: WebMcpTool[]) {
@@ -432,7 +432,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   function setDiscoveryWidget(ctx: typeof lastCtx, diff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined) {
     ctx?.ui.setWidget?.("webmcp-discovery", diff
-      ? (_tui: unknown, theme: any) => new Text(discoveryDisplayText(diff, !!ctx.ui.getToolsExpanded?.(), theme), 0, 0)
+      ? (_tui: unknown, theme: any) => new Text(discoveryDisplayText(diff, !!ctx.ui.getToolsExpanded?.(), theme))
       : undefined);
   }
 
@@ -714,6 +714,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         await connectBrowser();
         const tools = await scanAndStore(rest.join(" "), true);
         notifyDiscoveryDiff(ctx);
+        // TODO: consider different UI
         if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
       } catch (err: any) {
         ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
