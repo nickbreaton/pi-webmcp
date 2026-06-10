@@ -240,29 +240,27 @@ function renderExecuteResult(result: { content?: Array<{ type: string; text?: st
 
 const initializedDiscoveryMessages = new WeakSet<object>();
 
-function renderDiscoveryMessage(message: { details?: { tools?: WebMcpTool[]; added?: WebMcpTool[]; removed?: WebMcpTool[] } }, { expanded }: { expanded: boolean }, theme: any) {
-  const added = message.details?.added ?? message.details?.tools ?? [];
-  const removed = message.details?.removed ?? [];
-  const initialized = initializedDiscoveryMessages.has(message);
-  if (!initialized) initializedDiscoveryMessages.add(message);
-  const showDetails = initialized && expanded;
-
+function discoveryDisplayText(diff: { added?: WebMcpTool[]; removed?: WebMcpTool[]; tools?: WebMcpTool[] }, expanded: boolean, theme: any) {
+  const added = diff.added ?? diff.tools ?? [];
+  const removed = diff.removed ?? [];
   const parts = [];
   if (added.length > 0) parts.push(`${added.length} new`);
   if (removed.length > 0) parts.push(`${removed.length} removed`);
   const summary = parts.length > 0 ? `WebMCP tools changed: ${parts.join(", ")}` : `WebMCP scanned: ${added.length} tool(s) found`;
 
   let text = theme.fg("toolTitle", theme.bold(summary));
-  if (!showDetails) {
-    text += ` ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`;
-    return new Text(text, 0, 0);
-  }
+  if (!expanded) return `${text} ${theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`)}`;
 
   const sections = [];
   if (added.length > 0) sections.push(`New WebMCP tools:\n${listToolsText(added)}`);
   if (removed.length > 0) sections.push(`Removed WebMCP tools (no longer available):\n${listToolsText(removed)}`);
-  text += `\n\n${sections.join("\n\n") || listToolsText(added)}`;
-  return new Text(text, 0, 0);
+  return `${text}\n\n${sections.join("\n\n") || listToolsText(added)}`;
+}
+
+function renderDiscoveryMessage(message: { details?: { tools?: WebMcpTool[]; added?: WebMcpTool[]; removed?: WebMcpTool[] } }, { expanded }: { expanded: boolean }, theme: any) {
+  const initialized = initializedDiscoveryMessages.has(message);
+  if (!initialized) initializedDiscoveryMessages.add(message);
+  return new Text(discoveryDisplayText(message.details ?? {}, initialized && expanded, theme), 0, 0);
 }
 
 function listToolsText(tools: WebMcpTool[]) {
@@ -298,7 +296,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   let registryCurrent = false;
   let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
   let unsubscribeTerminalInput: (() => void) | undefined;
-  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
+  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; setWidget?(key: string, content: any, options?: any): void; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
 
   function toolDiff() {
     const currentKeys = new Set([...registry.values()].map(llmToolKey));
@@ -371,11 +369,35 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     restoreLlmKnownToolsFromSession(ctx);
     unsubscribeTerminalInput?.();
     unsubscribeTerminalInput = ctx.ui.onTerminalInput?.((input: string) => {
-      if (!getKeybindings().matches(input, "app.tools.expand")) return undefined;
-      setTimeout(() => {
-        if (lastCtx && lastNotifiedDiff) notifyDiscoveryDiff(lastCtx, true);
-      }, 0);
-      return undefined;
+      if (getKeybindings().matches(input, "app.tools.expand")) {
+        setTimeout(() => {
+          if (lastCtx && lastNotifiedDiff) notifyDiscoveryDiff(lastCtx, true);
+        }, 0);
+        return undefined;
+      }
+
+      if (!getKeybindings().matches(input, "tui.input.submit")) return undefined;
+      const text = ctx.ui.getEditorText?.().trim();
+      if (!text || text.startsWith("/")) return undefined;
+      const diff = toolDiff();
+      if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
+
+      ctx.ui.setWidget?.("webmcp-discovery", undefined);
+      if (pendingDiscoveryCheck) {
+        clearTimeout(pendingDiscoveryCheck);
+        pendingDiscoveryCheck = undefined;
+      }
+      lastNotifiedDiff = undefined;
+      pi.sendMessage({
+        customType: "webmcp-discovery",
+        content: discoveryContent(diff),
+        display: true,
+        details: { added: diff.added, removed: diff.removed },
+      });
+      rememberLlmToolState();
+      ctx.ui.setEditorText?.("");
+      pi.sendUserMessage(text);
+      return { consume: true };
     });
   });
 
@@ -388,6 +410,13 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   pi.registerMessageRenderer?.("webmcp-discovery", renderDiscoveryMessage);
 
+  function discoveryContent(diff: { added: WebMcpTool[]; removed: WebMcpTool[] }) {
+    const sections = [];
+    if (diff.added.length > 0) sections.push(`New WebMCP tools:\n\n${listToolsText(diff.added)}`);
+    if (diff.removed.length > 0) sections.push(`Removed WebMCP tools (no longer available):\n\n${listToolsText(diff.removed)}`);
+    return `WebMCP tool state changed since the LLM was last informed.\n\n${sections.join("\n\n")}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke an available tool.`;
+  }
+
   function notifyDiscoveryDiff(ctx = lastCtx, force = false) {
     if (!ctx) return;
     const diff = force && lastNotifiedDiff ? lastNotifiedDiff : toolDiff();
@@ -396,24 +425,16 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     if (!force && signature === notifiedDiffSignature) return;
     notifiedDiffSignature = signature;
     lastNotifiedDiff = diff;
-    const parts = [];
-    if (diff.added.length > 0) parts.push(`${diff.added.length} new`);
-    if (diff.removed.length > 0) parts.push(`${diff.removed.length} removed`);
-    const summary = `WebMCP tools changed: ${parts.join(", ")}`;
-    const theme = ctx.ui.theme;
-    const title = theme?.fg ? theme.fg("toolTitle", theme.bold?.(summary) ?? summary) : summary;
-    if (!ctx.ui.getToolsExpanded?.()) {
-      const hint = theme?.fg ? theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`) : `(${keyText("app.tools.expand")} to expand)`;
-      ctx.ui.notify(`${title}\n\n${hint}`, "info");
-      return;
-    }
-    const sections = [];
-    if (diff.added.length > 0) sections.push(`New WebMCP tools:\n${listToolsText(diff.added)}`);
-    if (diff.removed.length > 0) sections.push(`Removed WebMCP tools:\n${listToolsText(diff.removed)}`);
-    ctx.ui.notify(`${title}\n\n${sections.join("\n\n")}`, "info");
+    setDiscoveryWidget(ctx, diff);
   }
 
   let lastScanNewCount = 0;
+
+  function setDiscoveryWidget(ctx: typeof lastCtx, diff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined) {
+    ctx?.ui.setWidget?.("webmcp-discovery", diff
+      ? (_tui: unknown, theme: any) => new Text(discoveryDisplayText(diff, !!ctx.ui.getToolsExpanded?.(), theme), 0, 0)
+      : undefined);
+  }
 
   function scheduleDiscoveryAnnouncement(ctx = lastCtx) {
     if (ctx) lastCtx = ctx;
@@ -530,20 +551,18 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     const diff = toolDiff();
     if (diff.added.length === 0 && diff.removed.length === 0) return;
     lastCtx = ctx;
-    const parts = [];
-    if (diff.added.length > 0) parts.push(`${diff.added.length} new`);
-    if (diff.removed.length > 0) parts.push(`${diff.removed.length} removed`);
-    const summary = `WebMCP tools changed: ${parts.join(", ")}`;
-    ctx.ui.notify(ctx.ui.theme?.fg ? ctx.ui.theme.fg("dim", summary) : summary, "info");
+    if (pendingDiscoveryCheck) {
+      clearTimeout(pendingDiscoveryCheck);
+      pendingDiscoveryCheck = undefined;
+    }
+    lastNotifiedDiff = undefined;
+    setDiscoveryWidget(ctx, undefined);
     rememberLlmToolState();
-    const removedText = diff.removed.length > 0
-      ? `\n\nRemoved WebMCP tools (no longer available):\n${listToolsText(diff.removed)}`
-      : "";
     return {
       message: {
         customType: "webmcp-discovery",
-        content: `WebMCP tool state changed since the LLM was last informed.\n\nNew WebMCP tools:\n\n${listToolsText(diff.added)}${removedText}\n\nUse webmcp_describe to inspect parameters and webmcp_execute with the listed origin to invoke an available tool.`,
-        display: false,
+        content: discoveryContent(diff),
+        display: true,
         details: { added: diff.added, removed: diff.removed },
       },
     };
