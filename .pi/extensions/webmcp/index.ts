@@ -66,7 +66,7 @@ const attachedSessions = new Map<string, string>();
 const targetInfoById = new Map<string, TargetInfo>();
 const targetIdBySession = new Map<string, string>();
 
-async function openBrowser(): Promise<CdpClient> {
+async function connectBrowser(): Promise<CdpClient> {
   if (browserClient) return browserClient;
   browserClient = await CDP({ target: DEFAULT_WS, local: true }) as CdpClient;
   const clear = () => {
@@ -78,6 +78,14 @@ async function openBrowser(): Promise<CdpClient> {
   browserClient.once?.("disconnect", clear);
   browserClient.once?.("error", clear);
   return browserClient;
+}
+
+function existingBrowser(): CdpClient | undefined {
+  return browserClient;
+}
+
+function webMcpConnectInstruction() {
+  return "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` (or `/webmcp connect`) before using WebMCP tools.";
 }
 
 async function disconnectBrowser(): Promise<void> {
@@ -120,7 +128,8 @@ async function getPageTargets(cdp: CdpClient, filter = ""): Promise<TargetInfo[]
 }
 
 async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
-  const cdp = await openBrowser();
+  const cdp = existingBrowser();
+  if (!cdp) throw new Error(webMcpConnectInstruction());
   const found: WebMcpTool[] = [];
   const targets = await getPageTargets(cdp, filter);
   for (const target of targets) {
@@ -149,7 +158,8 @@ async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
 }
 
 async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
-  const cdp = await openBrowser();
+  const cdp = existingBrowser();
+  if (!cdp) throw new Error(webMcpConnectInstruction());
   const sessionId = await getAttachedSession(cdp, tool.targetId);
   let invocationId: string | undefined;
   const responsePromise = new Promise<any>((resolve, reject) => {
@@ -330,6 +340,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     unsubscribeTerminalInput?.();
     unsubscribeTerminalInput = undefined;
     await disconnectBrowser();
+    monitoring = false;
   });
 
   pi.registerMessageRenderer?.("webmcp-discovery", renderDiscoveryMessage);
@@ -378,7 +389,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   async function attachMonitorTarget(target: TargetInfo) {
     targetInfoById.set(target.targetId, target);
     try {
-      await getAttachedSession(await openBrowser(), target.targetId);
+      const cdp = existingBrowser();
+      if (!cdp) return;
+      await getAttachedSession(cdp, target.targetId);
     } catch {
       // The tab may have closed between discovery and attach.
     }
@@ -386,8 +399,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   async function startToolMonitor() {
     if (monitoring) return;
+    const cdp = existingBrowser();
+    if (!cdp) throw new Error(webMcpConnectInstruction());
     monitoring = true;
-    const cdp = await openBrowser();
 
     cdp.on("WebMCP.toolsAdded", (ev: any, evSessionId?: string) => {
       if (!evSessionId) return;
@@ -514,11 +528,12 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     renderCall: renderListCall,
     renderResult: renderListResult,
     async execute(_toolCallId, params) {
+      if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false, tools: [] as WebMcpTool[] } };
       if (params.refresh !== false || registry.size === 0) await scanAndStore(params.filter ?? "", true);
       const tools = [...registry.values()].filter(t =>
         !params.filter || t.url.includes(params.filter) || t.title?.includes(params.filter) || t.origin.includes(params.filter) || t.targetId === params.filter
       );
-      return { content: [{ type: "text" as const, text: listToolsText(tools) }], details: { tools } };
+      return { content: [{ type: "text" as const, text: listToolsText(tools) }], details: { connected: true, tools } };
     },
   });
 
@@ -537,6 +552,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     renderCall: renderDescribeCall,
     renderResult: renderDescribeResult,
     async execute(_toolCallId: string, params: { tool: string; origin: string }) {
+      if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
@@ -565,6 +581,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     renderCall: renderExecuteCall,
     renderResult: renderExecuteResult,
     async execute(_toolCallId: string, params: { tool: string; origin: string; args?: string }) {
+      if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
@@ -591,6 +608,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     parameters: Type.Object({}),
     async execute() {
       await disconnectBrowser();
+      monitoring = false;
       registry.clear();
       return { content: [{ type: "text" as const, text: "WebMCP disconnected and registry cleared." }], details: {} };
     },
@@ -615,6 +633,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
       if (normalized === "disconnect") {
         await disconnectBrowser();
+        monitoring = false;
         registry.clear();
         ctx.ui.notify("WebMCP disconnected from Chrome.", "info");
         return;
@@ -627,6 +646,8 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
       try {
         lastCtx = ctx;
+        if (!existingBrowser()) monitoring = false;
+        await connectBrowser();
         const tools = await scanAndStore(rest.join(" "), true);
         notifyDiscoveryDiff(ctx);
         if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
