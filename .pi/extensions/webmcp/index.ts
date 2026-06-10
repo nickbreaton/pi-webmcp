@@ -468,9 +468,15 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     scheduleDiscoveryAnnouncement(ctx);
   });
 
-  pi.on("before_agent_start", async () => {
+  pi.on("before_agent_start", async (_event, ctx) => {
     const diff = toolDiff();
     if (diff.added.length === 0 && diff.removed.length === 0) return;
+    lastCtx = ctx;
+    const parts = [];
+    if (diff.added.length > 0) parts.push(`${diff.added.length} new`);
+    if (diff.removed.length > 0) parts.push(`${diff.removed.length} removed`);
+    const summary = `WebMCP tools changed: ${parts.join(", ")}`;
+    ctx.ui.notify(ctx.ui.theme?.fg ? ctx.ui.theme.fg("dim", summary) : summary, "info");
     rememberLlmToolState();
     const removedText = diff.removed.length > 0
       ? `\n\nRemoved WebMCP tools (no longer available):\n${listToolsText(diff.removed)}`
