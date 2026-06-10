@@ -48,6 +48,11 @@ function registryKey(tool: WebMcpTool) {
   return `${tool.origin}::${tool.frameId}::${tool.name}`;
 }
 
+function llmToolKey(tool: WebMcpTool) {
+  const schemaSignature = tool.inputSchema ? JSON.stringify(tool.inputSchema) : "";
+  return `${tool.origin}::${tool.name}::${schemaSignature}`;
+}
+
 function formatSchema(schema: any, indent = 2): string {
   if (!schema || typeof schema !== "object") return "  (none)";
   const properties = schema.properties && typeof schema.properties === "object" ? schema.properties : {};
@@ -290,26 +295,29 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   let notifiedDiffSignature = "";
   let lastNotifiedDiff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined;
   let monitoring = false;
+  let registryCurrent = false;
   let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
   let unsubscribeTerminalInput: (() => void) | undefined;
   let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
 
   function toolDiff() {
-    const currentKeys = new Set(registry.keys());
-    const added = [...registry.entries()].filter(([key]) => !llmKnownTools.has(key)).map(([, tool]) => tool);
-    const removed = [...llmKnownTools.entries()].filter(([key]) => !currentKeys.has(key)).map(([, tool]) => tool);
+    const currentKeys = new Set([...registry.values()].map(llmToolKey));
+    const added = [...registry.values()].filter(tool => !llmKnownTools.has(llmToolKey(tool)));
+    const removed = registryCurrent
+      ? [...llmKnownTools.entries()].filter(([key]) => !currentKeys.has(key)).map(([, tool]) => tool)
+      : [];
     return { added, removed };
   }
 
   function diffSignature(diff = toolDiff()) {
     return [
-      ...diff.added.map(tool => `+${registryKey(tool)}`),
-      ...diff.removed.map(tool => `-${registryKey(tool)}`),
+      ...diff.added.map(tool => `+${llmToolKey(tool)}`),
+      ...diff.removed.map(tool => `-${llmToolKey(tool)}`),
     ].sort().join("\n");
   }
 
   function rememberLlmToolState() {
-    llmKnownTools = new Map(registry);
+    llmKnownTools = new Map([...registry.values()].map(tool => [llmToolKey(tool), tool]));
     notifiedDiffSignature = "";
   }
 
@@ -324,8 +332,43 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     if (changed) scheduleDiscoveryAnnouncement();
   }
 
+  function rememberToolSnapshot(tools: unknown) {
+    if (!Array.isArray(tools)) return;
+    for (const tool of tools) {
+      if (!tool || typeof tool !== "object") continue;
+      const candidate = tool as WebMcpTool;
+      if (!candidate.origin || !candidate.name) continue;
+      llmKnownTools.set(llmToolKey(candidate), candidate);
+    }
+  }
+
+  function forgetToolSnapshot(tools: unknown) {
+    if (!Array.isArray(tools)) return;
+    for (const tool of tools) {
+      if (!tool || typeof tool !== "object") continue;
+      const candidate = tool as WebMcpTool;
+      if (!candidate.origin || !candidate.name) continue;
+      llmKnownTools.delete(llmToolKey(candidate));
+    }
+  }
+
+  function restoreLlmKnownToolsFromSession(ctx: { sessionManager: { getBranch(): any[] } }) {
+    llmKnownTools = new Map();
+    for (const entry of ctx.sessionManager.getBranch()) {
+      if (entry.type === "message" && entry.message?.role === "toolResult" && entry.message.toolName === "webmcp_list") {
+        rememberToolSnapshot(entry.message.details?.tools);
+      }
+      if (entry.type === "custom_message" && entry.customType === "webmcp-discovery") {
+        rememberToolSnapshot(entry.details?.added);
+        forgetToolSnapshot(entry.details?.removed);
+      }
+    }
+    notifiedDiffSignature = "";
+  }
+
   pi.on("session_start", async (_event, ctx) => {
     lastCtx = ctx;
+    restoreLlmKnownToolsFromSession(ctx);
     unsubscribeTerminalInput?.();
     unsubscribeTerminalInput = ctx.ui.onTerminalInput?.((input: string) => {
       if (!getKeybindings().matches(input, "app.tools.expand")) return undefined;
@@ -472,6 +515,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     const newTools = tools.filter(tool => !registry.has(registryKey(tool)));
     lastScanNewCount = newTools.length;
     upsertTools(registry, tools);
+    registryCurrent = true;
     if (announce) scheduleDiscoveryAnnouncement();
     else scheduleDiscoveryAnnouncement();
     return tools;
@@ -610,6 +654,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       await disconnectBrowser();
       monitoring = false;
       registry.clear();
+      registryCurrent = false;
       return { content: [{ type: "text" as const, text: "WebMCP disconnected and registry cleared." }], details: {} };
     },
   });
