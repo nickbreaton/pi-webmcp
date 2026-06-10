@@ -1,5 +1,5 @@
 import { keyHint, keyText, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Text } from "@earendil-works/pi-tui";
+import { getKeybindings, Text } from "@earendil-works/pi-tui";
 import CDP from "chrome-remote-interface";
 import type { Client } from "chrome-remote-interface";
 import { Type } from "typebox";
@@ -225,18 +225,28 @@ function renderExecuteResult(result: { content?: Array<{ type: string; text?: st
 
 const initializedDiscoveryMessages = new WeakSet<object>();
 
-function renderDiscoveryMessage(message: { details?: { tools?: WebMcpTool[] } }, { expanded }: { expanded: boolean }, theme: any) {
-  const tools = message.details?.tools ?? [];
+function renderDiscoveryMessage(message: { details?: { tools?: WebMcpTool[]; added?: WebMcpTool[]; removed?: WebMcpTool[] } }, { expanded }: { expanded: boolean }, theme: any) {
+  const added = message.details?.added ?? message.details?.tools ?? [];
+  const removed = message.details?.removed ?? [];
   const initialized = initializedDiscoveryMessages.has(message);
   if (!initialized) initializedDiscoveryMessages.add(message);
   const showDetails = initialized && expanded;
 
-  let text = theme.fg("toolTitle", theme.bold(`WebMCP scanned: ${tools.length} tool(s) found`));
+  const parts = [];
+  if (added.length > 0) parts.push(`${added.length} new`);
+  if (removed.length > 0) parts.push(`${removed.length} removed`);
+  const summary = parts.length > 0 ? `WebMCP tools changed: ${parts.join(", ")}` : `WebMCP scanned: ${added.length} tool(s) found`;
+
+  let text = theme.fg("toolTitle", theme.bold(summary));
   if (!showDetails) {
     text += ` ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`;
     return new Text(text, 0, 0);
   }
-  text += `\n\n${listToolsText(tools)}`;
+
+  const sections = [];
+  if (added.length > 0) sections.push(`New WebMCP tools:\n${listToolsText(added)}`);
+  if (removed.length > 0) sections.push(`Removed WebMCP tools (no longer available):\n${listToolsText(removed)}`);
+  text += `\n\n${sections.join("\n\n") || listToolsText(added)}`;
   return new Text(text, 0, 0);
 }
 
@@ -268,9 +278,11 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   const registry = new Map<string, WebMcpTool>();
   let llmKnownTools = new Map<string, WebMcpTool>();
   let notifiedDiffSignature = "";
+  let lastNotifiedDiff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined;
   let monitoring = false;
   let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
-  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void } } | undefined;
+  let unsubscribeTerminalInput: (() => void) | undefined;
+  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; getToolsExpanded?(): boolean; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
 
   function toolDiff() {
     const currentKeys = new Set(registry.keys());
@@ -304,25 +316,44 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     lastCtx = ctx;
+    unsubscribeTerminalInput?.();
+    unsubscribeTerminalInput = ctx.ui.onTerminalInput?.((input: string) => {
+      if (!getKeybindings().matches(input, "app.tools.expand")) return undefined;
+      setTimeout(() => {
+        if (lastCtx && lastNotifiedDiff) notifyDiscoveryDiff(lastCtx, true);
+      }, 0);
+      return undefined;
+    });
   });
 
   pi.on("session_shutdown", async () => {
+    unsubscribeTerminalInput?.();
+    unsubscribeTerminalInput = undefined;
     await disconnectBrowser();
   });
 
   pi.registerMessageRenderer?.("webmcp-discovery", renderDiscoveryMessage);
 
-  function notifyDiscoveryDiff(ctx = lastCtx) {
+  function notifyDiscoveryDiff(ctx = lastCtx, force = false) {
     if (!ctx) return;
-    const diff = toolDiff();
+    const diff = force && lastNotifiedDiff ? lastNotifiedDiff : toolDiff();
     if (diff.added.length === 0 && diff.removed.length === 0) return;
     const signature = diffSignature(diff);
-    if (signature === notifiedDiffSignature) return;
+    if (!force && signature === notifiedDiffSignature) return;
     notifiedDiffSignature = signature;
+    lastNotifiedDiff = diff;
     const parts = [];
     if (diff.added.length > 0) parts.push(`${diff.added.length} new`);
     if (diff.removed.length > 0) parts.push(`${diff.removed.length} removed`);
-    ctx.ui.notify(`WebMCP tools changed (${parts.join(", ")}). The next message will include updated tool context.`, "info");
+    const summary = `WebMCP tools changed: ${parts.join(", ")}`;
+    if (!ctx.ui.getToolsExpanded?.()) {
+      ctx.ui.notify(`${summary}. ${keyHint("app.tools.expand", "Show details")}. The next message will include updated tool context.`, "info");
+      return;
+    }
+    const sections = [];
+    if (diff.added.length > 0) sections.push(`New WebMCP tools:\n${listToolsText(diff.added)}`);
+    if (diff.removed.length > 0) sections.push(`Removed WebMCP tools:\n${listToolsText(diff.removed)}`);
+    ctx.ui.notify(`${summary}\n\n${sections.join("\n\n")}\n\nThe next message will include updated tool context.`, "info");
   }
 
   let lastScanNewCount = 0;
