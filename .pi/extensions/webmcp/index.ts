@@ -282,7 +282,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   let monitoring = false;
   let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
   let unsubscribeTerminalInput: (() => void) | undefined;
-  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; getToolsExpanded?(): boolean; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
+  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
 
   function toolDiff() {
     const currentKeys = new Set(registry.keys());
@@ -346,14 +346,17 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     if (diff.added.length > 0) parts.push(`${diff.added.length} new`);
     if (diff.removed.length > 0) parts.push(`${diff.removed.length} removed`);
     const summary = `WebMCP tools changed: ${parts.join(", ")}`;
+    const theme = ctx.ui.theme;
+    const title = theme?.fg ? theme.fg("toolTitle", theme.bold?.(summary) ?? summary) : summary;
     if (!ctx.ui.getToolsExpanded?.()) {
-      ctx.ui.notify(`${summary}. ${keyHint("app.tools.expand", "Show details")}. The next message will include updated tool context.`, "info");
+      const hint = theme?.fg ? theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`) : `(${keyText("app.tools.expand")} to expand)`;
+      ctx.ui.notify(`${title}\n\n${hint}`, "info");
       return;
     }
     const sections = [];
     if (diff.added.length > 0) sections.push(`New WebMCP tools:\n${listToolsText(diff.added)}`);
     if (diff.removed.length > 0) sections.push(`Removed WebMCP tools:\n${listToolsText(diff.removed)}`);
-    ctx.ui.notify(`${summary}\n\n${sections.join("\n\n")}\n\nThe next message will include updated tool context.`, "info");
+    ctx.ui.notify(`${title}\n\n${sections.join("\n\n")}`, "info");
   }
 
   let lastScanNewCount = 0;
