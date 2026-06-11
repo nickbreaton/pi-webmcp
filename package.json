@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "chrome-remote-interface": "^0.33.3"
+    "chrome-remote-interface": "^0.33.3",
+    "effect": "^4.0.0-beta.78"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
