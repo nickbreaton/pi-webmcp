@@ -289,7 +289,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   let lastNotifiedDiff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined;
   let monitoring = false;
   let registryCurrent = false;
-  let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
+  let discoveryAnnouncementPending = false;
   let unsubscribeTerminalInput: (() => void) | undefined;
   let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; setToolsExpanded?(expanded: boolean): void; setWidget?(key: string, content: any, options?: any): void; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
 
@@ -378,10 +378,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
 
       ctx.ui.setWidget?.("webmcp", undefined);
-      if (pendingDiscoveryCheck) {
-        clearTimeout(pendingDiscoveryCheck);
-        pendingDiscoveryCheck = undefined;
-      }
+      discoveryAnnouncementPending = false;
       lastNotifiedDiff = undefined;
       pi.sendMessage({
         customType: "webmcp",
@@ -433,16 +430,17 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   function scheduleDiscoveryAnnouncement(ctx = lastCtx) {
     if (ctx) lastCtx = ctx;
-    if (pendingDiscoveryCheck) return;
-    pendingDiscoveryCheck = setTimeout(() => {
-      pendingDiscoveryCheck = undefined;
-      const currentCtx = ctx ?? lastCtx;
-      if (currentCtx && (!currentCtx.isIdle() || currentCtx.hasPendingMessages())) {
-        scheduleDiscoveryAnnouncement(currentCtx);
-        return;
-      }
-      notifyDiscoveryDiff(currentCtx);
-    }, 250);
+    const currentCtx = ctx ?? lastCtx;
+    if (!currentCtx) {
+      discoveryAnnouncementPending = true;
+      return;
+    }
+    if (!currentCtx.isIdle() || currentCtx.hasPendingMessages()) {
+      discoveryAnnouncementPending = true;
+      return;
+    }
+    discoveryAnnouncementPending = false;
+    notifyDiscoveryDiff(currentCtx);
   }
 
   async function attachMonitorTarget(target: TargetInfo) {
@@ -539,17 +537,14 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   pi.on("agent_end", async (_event, ctx) => {
     lastCtx = ctx;
-    scheduleDiscoveryAnnouncement(ctx);
+    if (discoveryAnnouncementPending) scheduleDiscoveryAnnouncement(ctx);
   });
 
   pi.on("before_agent_start", async (_event, ctx) => {
     const diff = toolDiff();
     if (diff.added.length === 0 && diff.removed.length === 0) return;
     lastCtx = ctx;
-    if (pendingDiscoveryCheck) {
-      clearTimeout(pendingDiscoveryCheck);
-      pendingDiscoveryCheck = undefined;
-    }
+    discoveryAnnouncementPending = false;
     lastNotifiedDiff = undefined;
     // clear widget
     setDiscoveryWidget(ctx, undefined);
