@@ -139,7 +139,6 @@ async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
   const targets = await getPageTargets(cdp, filter);
   for (const target of targets) {
     const sessionId = await getAttachedSession(cdp, target.targetId);
-    const before = found.length;
     const handler = (ev: any, evSessionId?: string) => {
       if (evSessionId !== sessionId) return;
       for (const tool of ev.tools ?? []) {
@@ -154,10 +153,6 @@ async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
     };
     cdp.on("WebMCP.toolsAdded", handler);
     await cdp.send("WebMCP.enable", {}, sessionId);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    if (found.length === before) {
-      // No tools reported for this target during the scan window.
-    }
   }
   return found;
 }
