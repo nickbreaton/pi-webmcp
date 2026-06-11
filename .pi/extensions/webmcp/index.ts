@@ -1,16 +1,9 @@
 import { keyHint, keyText, type AgentToolResult, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Text } from "@earendil-works/pi-tui";
-import { Layer, ManagedRuntime } from "effect";
-import CDP from "chrome-remote-interface";
+import { Layer, ManagedRuntime, Option } from "effect";
+import { BrowserClient, type CdpClient } from "./BrowserClient";
 import { PiApi } from "./PiApi";
-import type { Client } from "chrome-remote-interface";
 import { Type } from "typebox";
-
-const DEFAULT_HOST = process.env.CDP_HOST ?? "127.0.0.1";
-const DEFAULT_PORT = Number(process.env.CDP_PORT ?? 9222);
-const DEFAULT_WS = process.env.CDP_WS ?? `ws://${DEFAULT_HOST}:${DEFAULT_PORT}/devtools/browser`;
-
-const webMcpMemoMap = Layer.makeMemoMapUnsafe();
 
 type TargetInfo = { targetId: string; title: string; url: string; type: string };
 type WebMcpTool = {
@@ -34,13 +27,6 @@ type WebMcpExecuteDetails =
   | { connected: false }
   | { candidates: WebMcpTool[]; error: "tool_not_found_or_ambiguous" }
   | { id: string; origin: string; tool: WebMcpTool; input: Record<string, unknown>; result: any };
-
-type CdpClient = Client & {
-  send(method: string, params?: any, sessionId?: string): Promise<any>;
-  on(method: string, cb: (params: any, sessionId?: string) => void): void;
-  once(method: string, cb: (...args: any[]) => void): void;
-  close(): Promise<void> | void;
-};
 
 function safeName(input: string) {
   return input.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48) || "tool";
@@ -80,47 +66,26 @@ function formatSchema(schema: any, indent = 2): string {
   return lines.length ? lines.join("\n") : `${" ".repeat(indent)}(no parameters)`;
 }
 
-let browserClient: CdpClient | undefined;
 const attachedSessions = new Map<string, string>();
 const targetInfoById = new Map<string, TargetInfo>();
 const targetIdBySession = new Map<string, string>();
 
-async function connectBrowser(): Promise<CdpClient> {
-  if (browserClient) return browserClient;
-  browserClient = await CDP({ target: DEFAULT_WS, local: true }) as CdpClient;
-  const clear = () => {
-    browserClient = undefined;
-    attachedSessions.clear();
-    targetInfoById.clear();
-    targetIdBySession.clear();
-  };
-  browserClient.once?.("disconnect", clear);
-  browserClient.once?.("error", clear);
-  return browserClient;
-}
-
-function existingBrowser(): CdpClient | undefined {
-  return browserClient;
+function clearBrowserState() {
+  attachedSessions.clear();
+  targetInfoById.clear();
+  targetIdBySession.clear();
 }
 
 function webMcpConnectInstruction() {
   return "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` (or `/webmcp connect`) before using WebMCP tools.";
 }
 
-async function disconnectBrowser(): Promise<void> {
-  const cdp = browserClient;
-  if (!cdp) return;
-
+async function detachSessions(cdp: CdpClient): Promise<void> {
   const sessions = [...attachedSessions.values()];
-  attachedSessions.clear();
-  targetInfoById.clear();
-  targetIdBySession.clear();
-  browserClient = undefined;
-
+  clearBrowserState();
   await Promise.allSettled(
     sessions.map(sessionId => cdp.send("Target.detachFromTarget", { sessionId })),
   );
-  await Promise.resolve(cdp.close());
 }
 
 async function getAttachedSession(cdp: CdpClient, targetId: string): Promise<string> {
@@ -146,9 +111,7 @@ async function getPageTargets(cdp: CdpClient, filter = ""): Promise<TargetInfo[]
   );
 }
 
-async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
-  const cdp = existingBrowser();
-  if (!cdp) throw new Error(webMcpConnectInstruction());
+async function scanWebMcpTools(cdp: CdpClient, filter = ""): Promise<WebMcpTool[]> {
   const found: WebMcpTool[] = [];
   const targets = await getPageTargets(cdp, filter);
   for (const target of targets) {
@@ -171,9 +134,7 @@ async function scanWebMcpTools(filter = ""): Promise<WebMcpTool[]> {
   return found;
 }
 
-async function invokeWebMcpTool(tool: WebMcpTool, input: any): Promise<any> {
-  const cdp = existingBrowser();
-  if (!cdp) throw new Error(webMcpConnectInstruction());
+async function invokeWebMcpTool(cdp: CdpClient, tool: WebMcpTool, input: any): Promise<any> {
   const sessionId = await getAttachedSession(cdp, tool.targetId);
   let invocationId: string | undefined;
   const responsePromise = new Promise<any>((resolve, reject) => {
@@ -297,7 +258,13 @@ function listToolsText(tools: WebMcpTool[]) {
 }
 
 export default function webMcpExtension(pi: ExtensionAPI) {
-  const runtime = ManagedRuntime.make(Layer.succeed(PiApi, pi), { memoMap: webMcpMemoMap });
+  const runtime = ManagedRuntime.make(
+    Layer.mergeAll(
+      Layer.succeed(PiApi, pi),
+      BrowserClient.layer,
+    ),
+  );
+
   const registry = new Map<string, WebMcpTool>();
   let llmKnownTools = new Map<string, WebMcpTool>();
   let notifiedDiffSignature = "";
@@ -418,7 +385,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   async function attachMonitorTarget(target: TargetInfo) {
     targetInfoById.set(target.targetId, target);
     try {
-      const cdp = existingBrowser();
+      const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
       if (!cdp) return;
       await getAttachedSession(cdp, target.targetId);
     } catch {
@@ -428,7 +395,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   async function startToolMonitor() {
     if (monitoring) return;
-    const cdp = existingBrowser();
+    const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
     if (!cdp) throw new Error(webMcpConnectInstruction());
     monitoring = true;
 
@@ -496,7 +463,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
 
   async function scanAndStore(filter = "", announce = false) {
-    const tools = await scanWebMcpTools(filter);
+    const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
+    if (!cdp) throw new Error(webMcpConnectInstruction());
+    const tools = await scanWebMcpTools(cdp, filter);
     await startToolMonitor();
     const newTools = tools.filter(tool => !registry.has(registryKey(tool)));
     lastScanNewCount = newTools.length;
@@ -551,8 +520,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     unsubscribeTerminalInput?.();
     unsubscribeTerminalInput = undefined;
+    const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
+    if (cdp) await detachSessions(cdp);
     await Promise.allSettled([
-      disconnectBrowser(),
+      runtime.runPromise(BrowserClient.use(browser => browser.disconnect())),
       runtime.dispose(),
     ]);
     monitoring = false;
@@ -600,7 +571,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     renderCall: renderListCall,
     renderResult: renderListResult,
     async execute(_toolCallId, params) {
-      if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false, tools: [] as WebMcpTool[] } };
+      if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false, tools: [] as WebMcpTool[] } };
       if (params.refresh !== false || registry.size === 0) await scanAndStore(params.filter ?? "", true);
       const tools = [...registry.values()].filter(t =>
         !params.filter || t.url.includes(params.filter) || t.title?.includes(params.filter) || t.origin.includes(params.filter) || t.targetId === params.filter
@@ -624,7 +595,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     renderCall: renderDescribeCall,
     renderResult: renderDescribeResult,
     async execute(_toolCallId: string, params: { tool: string; origin: string }): Promise<AgentToolResult<WebMcpDescribeDetails>> {
-      if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
+      if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
@@ -653,7 +624,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     renderCall: renderExecuteCall,
     renderResult: renderExecuteResult,
     async execute(_toolCallId: string, params: { tool: string; origin: string; args?: string }): Promise<AgentToolResult<WebMcpExecuteDetails>> {
-      if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
+      if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
@@ -664,7 +635,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         input = JSON.parse(params.args);
         if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("args must be a JSON object string");
       }
-      const result = await invokeWebMcpTool(resolved, input);
+      const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
+      if (!cdp) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
+      const result = await invokeWebMcpTool(cdp, resolved, input);
       const text = `\nInput: \n${JSON.stringify(input, null, 2)} \n\nResponse: \n${JSON.stringify(result.response, null, 2)} `;
       return {
         content: [{ type: "text" as const, text }],
@@ -679,7 +652,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     description: "Disconnect from Chrome remote debugging and clear known WebMCP tools.",
     parameters: Type.Object({}),
     async execute() {
-      await disconnectBrowser();
+      const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
+      if (cdp) await detachSessions(cdp);
+      await runtime.runPromise(BrowserClient.use(browser => browser.disconnect()));
       monitoring = false;
       registry.clear();
       registryCurrent = false;
@@ -705,7 +680,9 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       const normalized = subcommand.toLowerCase();
 
       if (normalized === "disconnect") {
-        await disconnectBrowser();
+        const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
+        if (cdp) await detachSessions(cdp);
+        await runtime.runPromise(BrowserClient.use(browser => browser.disconnect()));
         monitoring = false;
         registry.clear();
         ctx.ui.notify("WebMCP disconnected from Chrome.", "info");
@@ -719,8 +696,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
       try {
         lastCtx = ctx;
-        if (!existingBrowser()) monitoring = false;
-        await connectBrowser();
+        if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) monitoring = false;
+        const cdp = await runtime.runPromise(BrowserClient.use(browser => browser.connect()));
+        cdp.on("disconnect", clearBrowserState);
+        cdp.on("error", clearBrowserState);
         const tools = await scanAndStore(rest.join(" "), true);
         notifyDiscoveryDiff(ctx);
         // TODO: consider different UI
