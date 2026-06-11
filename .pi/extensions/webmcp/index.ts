@@ -356,7 +356,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       if (entry.type === "message" && entry.message?.role === "toolResult" && entry.message.toolName === "webmcp_list") {
         rememberToolSnapshot(entry.message.details?.tools);
       }
-      if (entry.type === "custom_message" && entry.customType === "webmcp-discovery") {
+      if (entry.type === "custom_message" && entry.customType === "webmcp") {
         rememberToolSnapshot(entry.details?.added);
         forgetToolSnapshot(entry.details?.removed);
       }
@@ -382,14 +382,14 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       const diff = toolDiff();
       if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
 
-      ctx.ui.setWidget?.("webmcp-discovery", undefined);
+      ctx.ui.setWidget?.("webmcp", undefined);
       if (pendingDiscoveryCheck) {
         clearTimeout(pendingDiscoveryCheck);
         pendingDiscoveryCheck = undefined;
       }
       lastNotifiedDiff = undefined;
       pi.sendMessage({
-        customType: "webmcp-discovery",
+        customType: "webmcp",
         content: discoveryContent(diff),
         display: true,
         details: { added: diff.added, removed: diff.removed },
@@ -408,7 +408,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     monitoring = false;
   });
 
-  pi.registerMessageRenderer?.("webmcp-discovery", renderDiscoveryMessage);
+  pi.registerMessageRenderer?.("webmcp", renderDiscoveryMessage);
 
   function discoveryContent(diff: { added: WebMcpTool[]; removed: WebMcpTool[] }) {
     const sections = [];
@@ -431,7 +431,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   let lastScanNewCount = 0;
 
   function setDiscoveryWidget(ctx: typeof lastCtx, diff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined) {
-    ctx?.ui.setWidget?.("webmcp-discovery", diff
+    ctx?.ui.setWidget?.("webmcp", diff
       ? (_tui: unknown, theme: any) => new Text(`${discoveryDisplayText(diff, !!ctx.ui.getToolsExpanded?.(), theme)}\n\n`, 1, 0)
       : undefined);
   }
@@ -561,7 +561,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     rememberLlmToolState();
     return {
       message: {
-        customType: "webmcp-discovery",
+        customType: "webmcp",
         content: discoveryContent(diff),
         display: true,
         details: { added: diff.added, removed: diff.removed },
