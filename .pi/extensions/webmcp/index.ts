@@ -1,4 +1,4 @@
-import { keyHint, keyText, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { keyHint, keyText, type AgentToolResult, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Text } from "@earendil-works/pi-tui";
 import { Layer, ManagedRuntime } from "effect";
 import CDP from "chrome-remote-interface";
@@ -25,6 +25,16 @@ type WebMcpTool = {
   frameId: string;
   [key: string]: any;
 };
+
+type WebMcpDescribeDetails =
+  | { connected: false }
+  | { candidates: WebMcpTool[] }
+  | { tool: WebMcpTool; id: string };
+
+type WebMcpExecuteDetails =
+  | { connected: false }
+  | { candidates: WebMcpTool[]; error: "tool_not_found_or_ambiguous" }
+  | { id: string; origin: string; tool: WebMcpTool; input: Record<string, unknown>; result: any };
 
 type CdpClient = Client & {
   send(method: string, params?: any, sessionId?: string): Promise<any>;
@@ -599,7 +609,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
   });
 
-  (pi.registerTool as (tool: unknown) => unknown)({
+  pi.registerTool({
     name: "webmcp_describe",
     label: "WebMCP Describe",
     description: "Describe a WebMCP tool's page, origin, description, and input parameters.",
@@ -613,7 +623,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     }),
     renderCall: renderDescribeCall,
     renderResult: renderDescribeResult,
-    async execute(_toolCallId: string, params: { tool: string; origin: string }) {
+    async execute(_toolCallId: string, params: { tool: string; origin: string }): Promise<AgentToolResult<WebMcpDescribeDetails>> {
       if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
@@ -626,7 +636,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
   });
 
-  (pi.registerTool as (tool: unknown) => unknown)({
+  pi.registerTool({
     name: "webmcp_execute",
     label: "WebMCP Execute",
     description: "Execute a WebMCP tool exposed by an open Chrome tab.",
@@ -642,7 +652,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     }),
     renderCall: renderExecuteCall,
     renderResult: renderExecuteResult,
-    async execute(_toolCallId: string, params: { tool: string; origin: string; args?: string }) {
+    async execute(_toolCallId: string, params: { tool: string; origin: string; args?: string }): Promise<AgentToolResult<WebMcpExecuteDetails>> {
       if (!existingBrowser()) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
