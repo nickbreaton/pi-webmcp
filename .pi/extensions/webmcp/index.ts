@@ -1,5 +1,6 @@
 import { keyHint, keyText, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Text } from "@earendil-works/pi-tui";
+import { Layer, ManagedRuntime } from "effect";
 import CDP from "chrome-remote-interface";
 import type { Client } from "chrome-remote-interface";
 import { Type } from "typebox";
@@ -7,6 +8,10 @@ import { Type } from "typebox";
 const DEFAULT_HOST = process.env.CDP_HOST ?? "127.0.0.1";
 const DEFAULT_PORT = Number(process.env.CDP_PORT ?? 9222);
 const DEFAULT_WS = process.env.CDP_WS ?? `ws://${DEFAULT_HOST}:${DEFAULT_PORT}/devtools/browser`;
+
+const webMcpMemoMap = Layer.makeMemoMapUnsafe();
+const webMcpLayer = Layer.empty;
+const runtime = ManagedRuntime.make(webMcpLayer, { memoMap: webMcpMemoMap });
 
 type TargetInfo = { targetId: string; title: string; url: string; type: string };
 type WebMcpTool = {
@@ -536,7 +541,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   pi.on("session_shutdown", async () => {
     unsubscribeTerminalInput?.();
     unsubscribeTerminalInput = undefined;
-    await disconnectBrowser();
+    await Promise.allSettled([
+      disconnectBrowser(),
+      runtime.dispose(),
+    ]);
     monitoring = false;
   });
 
