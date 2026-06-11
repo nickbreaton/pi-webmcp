@@ -359,49 +359,6 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     notifiedDiffSignature = "";
   }
 
-  pi.on("session_start", async (_event, ctx) => {
-    lastCtx = ctx;
-    restoreLlmKnownToolsFromSession(ctx);
-    unsubscribeTerminalInput?.();
-    unsubscribeTerminalInput = ctx.ui.onTerminalInput?.((input: string) => {
-      if (getKeybindings().matches(input, "app.tools.expand") && lastNotifiedDiff) {
-        const expanded = !ctx.ui.getToolsExpanded?.();
-        ctx.ui.setToolsExpanded?.(expanded);
-        notifyDiscoveryDiff(ctx, true);
-        return { consume: true };
-      }
-
-      if (!getKeybindings().matches(input, "tui.input.submit")) return undefined;
-      const text = ctx.ui.getEditorText?.().trim();
-      if (!text || text.startsWith("/")) return undefined;
-      const diff = toolDiff();
-      if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
-
-      ctx.ui.setWidget?.("webmcp", undefined);
-      discoveryAnnouncementPending = false;
-      lastNotifiedDiff = undefined;
-      pi.sendMessage({
-        customType: "webmcp",
-        content: discoveryContent(diff),
-        display: true,
-        details: { added: diff.added, removed: diff.removed },
-      });
-      rememberLlmToolState();
-      ctx.ui.setEditorText?.("");
-      pi.sendUserMessage(text);
-      return { consume: true };
-    });
-  });
-
-  pi.on("session_shutdown", async () => {
-    unsubscribeTerminalInput?.();
-    unsubscribeTerminalInput = undefined;
-    await disconnectBrowser();
-    monitoring = false;
-  });
-
-  pi.registerMessageRenderer?.("webmcp", renderDiscoveryMessage);
-
   function discoveryContent(diff: { added: WebMcpTool[]; removed: WebMcpTool[] }) {
     const sections = [];
     if (diff.added.length > 0) sections.push(`New WebMCP tools:\n\n${listToolsText(diff.added)}`);
@@ -535,6 +492,56 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     return tools;
   }
 
+  const resolveTool = (name: string, origin?: string) => {
+    const candidates = [...registry.values()].filter(t =>
+      (toolId(t) === name || t.name === name) && (!origin || t.origin === origin)
+    );
+    return candidates.length === 1 ? candidates[0] : { candidates };
+  };
+
+  pi.on("session_start", async (_event, ctx) => {
+    lastCtx = ctx;
+    restoreLlmKnownToolsFromSession(ctx);
+    unsubscribeTerminalInput?.();
+    unsubscribeTerminalInput = ctx.ui.onTerminalInput?.((input: string) => {
+      if (getKeybindings().matches(input, "app.tools.expand") && lastNotifiedDiff) {
+        const expanded = !ctx.ui.getToolsExpanded?.();
+        ctx.ui.setToolsExpanded?.(expanded);
+        notifyDiscoveryDiff(ctx, true);
+        return { consume: true };
+      }
+
+      if (!getKeybindings().matches(input, "tui.input.submit")) return undefined;
+      const text = ctx.ui.getEditorText?.().trim();
+      if (!text || text.startsWith("/")) return undefined;
+      const diff = toolDiff();
+      if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
+
+      ctx.ui.setWidget?.("webmcp", undefined);
+      discoveryAnnouncementPending = false;
+      lastNotifiedDiff = undefined;
+      pi.sendMessage({
+        customType: "webmcp",
+        content: discoveryContent(diff),
+        display: true,
+        details: { added: diff.added, removed: diff.removed },
+      });
+      rememberLlmToolState();
+      ctx.ui.setEditorText?.("");
+      pi.sendUserMessage(text);
+      return { consume: true };
+    });
+  });
+
+  pi.on("session_shutdown", async () => {
+    unsubscribeTerminalInput?.();
+    unsubscribeTerminalInput = undefined;
+    await disconnectBrowser();
+    monitoring = false;
+  });
+
+  pi.registerMessageRenderer?.("webmcp", renderDiscoveryMessage);
+
   pi.on("agent_end", async (_event, ctx) => {
     lastCtx = ctx;
     if (discoveryAnnouncementPending) scheduleDiscoveryAnnouncement(ctx);
@@ -558,13 +565,6 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       },
     };
   });
-
-  const resolveTool = (name: string, origin?: string) => {
-    const candidates = [...registry.values()].filter(t =>
-      (toolId(t) === name || t.name === name) && (!origin || t.origin === origin)
-    );
-    return candidates.length === 1 ? candidates[0] : { candidates };
-  };
 
   pi.registerTool({
     name: "webmcp_list",
