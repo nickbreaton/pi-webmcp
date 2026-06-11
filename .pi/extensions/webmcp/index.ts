@@ -432,7 +432,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
 
   function setDiscoveryWidget(ctx: typeof lastCtx, diff: { added: WebMcpTool[]; removed: WebMcpTool[] } | undefined) {
     ctx?.ui.setWidget?.("webmcp-discovery", diff
-      ? (_tui: unknown, theme: any) => new Text(discoveryDisplayText(diff, !!ctx.ui.getToolsExpanded?.(), theme))
+      ? (_tui: unknown, theme: any) => new Text(`${discoveryDisplayText(diff, !!ctx.ui.getToolsExpanded?.(), theme)}\n\n`, 1, 0)
       : undefined);
   }
 
@@ -556,6 +556,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       pendingDiscoveryCheck = undefined;
     }
     lastNotifiedDiff = undefined;
+    // clear widget
     setDiscoveryWidget(ctx, undefined);
     rememberLlmToolState();
     return {
@@ -619,10 +620,10 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
-        return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates } };
+        return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool.Provide origin.\n\n${listToolsText(resolved.candidates)} ` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates } };
       }
       const id = toolId(resolved);
-      const text = `${resolved.description ?? "(no description)"}\n\nParameters:\n${formatSchema(resolved.inputSchema)}`;
+      const text = `${resolved.description ?? "(no description)"} \n\nParameters: \n${formatSchema(resolved.inputSchema)} `;
       return { content: [{ type: "text" as const, text }], details: { tool: resolved, id } };
     },
   });
@@ -648,7 +649,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       if (registry.size === 0) await scanAndStore("");
       const resolved = resolveTool(params.tool, params.origin);
       if ("candidates" in resolved) {
-        return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool. Retry with origin.\n\n${listToolsText(resolved.candidates)}` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates, error: "tool_not_found_or_ambiguous" } };
+        return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool.Retry with origin.\n\n${listToolsText(resolved.candidates)} ` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates, error: "tool_not_found_or_ambiguous" } };
       }
       let input: Record<string, unknown> = {};
       if (params.args) {
@@ -656,7 +657,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("args must be a JSON object string");
       }
       const result = await invokeWebMcpTool(resolved, input);
-      const text = `\nInput:\n${JSON.stringify(input, null, 2)}\n\nResponse:\n${JSON.stringify(result.response, null, 2)}`;
+      const text = `\nInput: \n${JSON.stringify(input, null, 2)} \n\nResponse: \n${JSON.stringify(result.response, null, 2)} `;
       return {
         content: [{ type: "text" as const, text }],
         details: { id: toolId(resolved), origin: resolved.origin, tool: resolved, input, result },
@@ -717,7 +718,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         // TODO: consider different UI
         if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
       } catch (err: any) {
-        ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err}`, "error");
+        ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err} `, "error");
       }
     },
   });
