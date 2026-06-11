@@ -291,7 +291,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
   let registryCurrent = false;
   let pendingDiscoveryCheck: ReturnType<typeof setTimeout> | undefined;
   let unsubscribeTerminalInput: (() => void) | undefined;
-  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; setWidget?(key: string, content: any, options?: any): void; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
+  let lastCtx: { isIdle(): boolean; hasPendingMessages(): boolean; ui: { notify(message: string, type?: "info" | "warning" | "error"): void; theme?: any; getToolsExpanded?(): boolean; setToolsExpanded?(expanded: boolean): void; setWidget?(key: string, content: any, options?: any): void; onTerminalInput?(handler: (input: string) => { consume?: boolean; data?: string } | undefined): () => void } } | undefined;
 
   function toolDiff() {
     const currentKeys = new Set([...registry.values()].map(llmToolKey));
@@ -364,11 +364,11 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     restoreLlmKnownToolsFromSession(ctx);
     unsubscribeTerminalInput?.();
     unsubscribeTerminalInput = ctx.ui.onTerminalInput?.((input: string) => {
-      if (getKeybindings().matches(input, "app.tools.expand")) {
-        setTimeout(() => {
-          if (lastCtx && lastNotifiedDiff) notifyDiscoveryDiff(lastCtx, true);
-        }, 0);
-        return undefined;
+      if (getKeybindings().matches(input, "app.tools.expand") && lastNotifiedDiff) {
+        const expanded = !ctx.ui.getToolsExpanded?.();
+        ctx.ui.setToolsExpanded?.(expanded);
+        notifyDiscoveryDiff(ctx, true);
+        return { consume: true };
       }
 
       if (!getKeybindings().matches(input, "tui.input.submit")) return undefined;
