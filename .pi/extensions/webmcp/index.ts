@@ -498,12 +498,13 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       if (!getKeybindings().matches(input, "tui.input.submit")) return undefined;
       const text = ctx.ui.getEditorText?.().trim();
       if (!text || text.startsWith("/")) return undefined;
-      const diff = toolDiff();
-      if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
 
       ctx.ui.setWidget?.("webmcp", undefined);
       discoveryAnnouncementPending = false;
       lastNotifiedDiff = undefined;
+
+      const diff = toolDiff();
+      if (diff.added.length === 0 && diff.removed.length === 0) return undefined;
       pi.sendMessage({
         customType: "webmcp",
         content: discoveryContent(diff),
