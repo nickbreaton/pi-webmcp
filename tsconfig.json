@@ -8,6 +8,11 @@
     "noEmit": true,
     "types": [
       "node"
+    ],
+    "plugins": [
+      {
+        "name": "@effect/language-service"
+      }
     ]
   },
   "include": [
