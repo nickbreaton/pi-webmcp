@@ -15,7 +15,7 @@
   "dependencies": {
     "@effect/language-service": "^0.86.2",
     "chrome-remote-interface": "^0.33.3",
-    "effect": "^4.0.0-beta.78"
+    "effect": "4.0.0-beta.83"
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
