@@ -665,33 +665,41 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
   });
 
+  const Subcommand = Schema.Literals([
+    "connect",
+    "disconnect"
+  ])
+
+  type SubcommandCompletion = {
+    value: typeof Subcommand.Type,
+    label: typeof Subcommand.Type
+    detail: string
+  }
+
   pi.registerCommand("webmcp", {
     description: "Connect to or disconnect from Chrome WebMCP tools",
-    getArgumentCompletions: (prefix: string) => {
-      const trimmed = prefix.trimStart();
-      if (trimmed.includes(" ")) return null;
-
-      const commands = [
-        { value: "connect", label: "connect", detail: "Scan Chrome WebMCP tools" },
-        { value: "disconnect", label: "disconnect", detail: "Disconnect from Chrome WebMCP" },
-      ];
-      const filtered = commands.filter(command => command.value.startsWith(trimmed));
-      return filtered.length > 0 ? filtered : null;
-    },
+    getArgumentCompletions: (): SubcommandCompletion[] => [
+      {
+        value: "connect",
+        label: "connect",
+        detail: "Scan Chrome WebMCP tools"
+      },
+      {
+        value: "disconnect",
+        label: "disconnect",
+        detail: "Disconnect from Chrome WebMCP"
+      },
+    ],
     handler: async (args, ctx) => {
-      const Command = Schema.Literals([
-        "connect",
-        "disconnect"
-      ])
 
       const result = Schema.String.pipe(
         Schema.decode(SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase())),
-        Schema.decodeTo(Schema.Literals(['', ...Command.literals])),
+        Schema.decodeTo(Schema.Literals(['', ...Subcommand.literals])),
         schema => Schema.decodeUnknownResult(schema)(args)
       );
 
       if (Result.isFailure(result)) {
-        ctx.ui.notify(`Usage: /webmcp [${Command.literals.join('|')}]`, "error");
+        ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join('|')}]`, "error");
         return;
       }
 
