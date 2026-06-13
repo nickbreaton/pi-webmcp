@@ -1,9 +1,11 @@
 import { keyHint, keyText, type AgentToolResult, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Text } from "@earendil-works/pi-tui";
-import { Layer, ManagedRuntime, Option } from "effect";
+import { Layer, ManagedRuntime, Option, Result, Schema, SchemaTransformation } from "effect";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
 import { PiApi } from "./PiApi";
 import { Type } from "typebox";
+import { toJsonSchemaDocument } from "effect/SchemaRepresentation";
+import { Connection } from "effect/unstable/sql/SqlConnection";
 
 type TargetInfo = { targetId: string; title: string; url: string; type: string };
 type WebMcpTool = {
@@ -677,10 +679,25 @@ export default function webMcpExtension(pi: ExtensionAPI) {
       return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
-      const [subcommand = "connect", ...rest] = args.trim().split(/\s+/).filter(Boolean);
-      const normalized = subcommand.toLowerCase();
+      const Command = Schema.Literals([
+        "connect",
+        "disconnect"
+      ])
 
-      if (normalized === "disconnect") {
+      const result = Schema.String.pipe(
+        Schema.decode(SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase())),
+        Schema.decodeTo(Schema.Literals(['', ...Command.literals])),
+        schema => Schema.decodeUnknownResult(schema)(args)
+      );
+
+      if (Result.isFailure(result)) {
+        ctx.ui.notify(`Usage: /webmcp [${Command.literals.join('|')}]`, "error");
+        return;
+      }
+
+      const command = result.success;
+
+      if (command === "disconnect") {
         const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
         if (cdp) await detachSessions(cdp);
         await runtime.runPromise(BrowserClient.use(browser => browser.disconnect()));
@@ -690,21 +707,18 @@ export default function webMcpExtension(pi: ExtensionAPI) {
         return;
       }
 
-      if (normalized !== "connect") {
-        ctx.ui.notify("Usage: /webmcp [connect|disconnect]", "error");
-        return;
-      }
-
       try {
         lastCtx = ctx;
         if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) monitoring = false;
         const cdp = await runtime.runPromise(BrowserClient.use(browser => browser.connect()));
         cdp.on("disconnect", clearBrowserState);
         cdp.on("error", clearBrowserState);
-        const tools = await scanAndStore(rest.join(" "), true);
+        const tools = await scanAndStore("", true);
         notifyDiscoveryDiff(ctx);
         // TODO: consider different UI
-        if (lastScanNewCount === 0) ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
+        if (lastScanNewCount === 0) {
+          ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
+        }
       } catch (err: any) {
         ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err} `, "error");
       }
