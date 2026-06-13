@@ -1,8 +1,9 @@
 import { keyHint, keyText, type AgentToolResult, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { getKeybindings, Text } from "@earendil-works/pi-tui";
-import { Layer, ManagedRuntime, Option, Result, Schema, SchemaTransformation } from "effect";
+import { Effect, Layer, ManagedRuntime, Option, Result, Schema, SchemaTransformation } from "effect";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
-import { PiApi } from "./PiApi";
+import { PiApi, PiContext } from "./PiApi";
+import { WebMcpCommandService } from "./WebMcpCommandService";
 import { Type } from "typebox";
 import { toJsonSchemaDocument } from "effect/SchemaRepresentation";
 import { Connection } from "effect/unstable/sql/SqlConnection";
@@ -665,71 +666,17 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
   });
 
-  const Subcommand = Schema.Literals([
-    "connect",
-    "disconnect"
-  ])
-
-  type SubcommandCompletion = {
-    value: typeof Subcommand.Type,
-    label: typeof Subcommand.Type
-    detail: string
-  }
-
   pi.registerCommand("webmcp", {
     description: "Connect to or disconnect from Chrome WebMCP tools",
-    getArgumentCompletions: (): SubcommandCompletion[] => [
-      {
-        value: "connect",
-        label: "connect",
-        detail: "Scan Chrome WebMCP tools"
-      },
-      {
-        value: "disconnect",
-        label: "disconnect",
-        detail: "Disconnect from Chrome WebMCP"
-      },
-    ],
+    getArgumentCompletions: () => {
+      return WebMcpCommandService.completions;
+    },
     handler: async (args, ctx) => {
-
-      const result = Schema.String.pipe(
-        Schema.decode(SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase())),
-        Schema.decodeTo(Schema.Literals(['', ...Subcommand.literals])),
-        schema => Schema.decodeUnknownResult(schema)(args)
-      );
-
-      if (Result.isFailure(result)) {
-        ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join('|')}]`, "error");
-        return;
-      }
-
-      const command = result.success;
-
-      if (command === "disconnect") {
-        const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
-        if (cdp) await detachSessions(cdp);
-        await runtime.runPromise(BrowserClient.use(browser => browser.disconnect()));
-        monitoring = false;
-        registry.clear();
-        ctx.ui.notify("WebMCP disconnected from Chrome.", "info");
-        return;
-      }
-
-      try {
-        lastCtx = ctx;
-        if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) monitoring = false;
-        const cdp = await runtime.runPromise(BrowserClient.use(browser => browser.connect()));
-        cdp.on("disconnect", clearBrowserState);
-        cdp.on("error", clearBrowserState);
-        const tools = await scanAndStore("", true);
-        notifyDiscoveryDiff(ctx);
-        // TODO: consider different UI
-        if (lastScanNewCount === 0) {
-          ctx.ui.notify(`WebMCP scanned: ${tools.length} tool(s) found`, "info");
-        }
-      } catch (err: any) {
-        ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err} `, "error");
-      }
+      const effect = WebMcpCommandService.use(service => service.handle(args)).pipe(
+        Effect.provide(WebMcpCommandService.layer),
+        Effect.provideService(PiContext, ctx),
+      )
+      await runtime.runPromise(effect);
     },
   });
 }
