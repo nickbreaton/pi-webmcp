@@ -8,29 +8,15 @@ const Subcommand = Schema.Literals([
   "disconnect",
 ]);
 
-export type SubcommandCompletion = {
-  value: typeof Subcommand.Type;
-  label: typeof Subcommand.Type;
-  detail: string;
-};
+const CommandArgs = Schema.String.pipe(
+  Schema.decode(SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase())),
+  Schema.decodeTo(Schema.Literals(["", ...Subcommand.literals])),
+);
 
 export class WebMcpCommandService extends Context.Service<WebMcpCommandService, {
   readonly handle: (args: string) => Effect.Effect<void, never, PiContext>;
 }>()("webmcp/WebMcpCommandService") {
-  static readonly completions: SubcommandCompletion[] = [
-    {
-      value: "connect",
-      label: "connect",
-      detail: "Scan Chrome WebMCP tools",
-    },
-    {
-      value: "disconnect",
-      label: "disconnect",
-      detail: "Disconnect from Chrome WebMCP",
-    },
-  ];
-
-  static readonly layer = Layer.effect(
+  static readonly liveWithoutDependencies = Layer.effect(
     WebMcpCommandService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
@@ -40,11 +26,7 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
         handle: (args) => Effect.gen(function* () {
           const ctx = yield* PiContext;
 
-          const result = Schema.String.pipe(
-            Schema.decode(SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase())),
-            Schema.decodeTo(Schema.Literals(["", ...Subcommand.literals])),
-            schema => Schema.decodeUnknownResult(schema)(args),
-          );
+          const result = Schema.decodeUnknownResult(CommandArgs)(args);
 
           if (Result.isFailure(result)) {
             ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join("|")}]`, "error");
@@ -80,5 +62,9 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
         }),
       });
     }),
+  );
+
+  static readonly live = WebMcpCommandService.liveWithoutDependencies.pipe(
+    Layer.provide(ToolScanService.liveWithoutDependencies),
   );
 }

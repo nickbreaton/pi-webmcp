@@ -1,38 +1,6 @@
 import { Context, Effect, Layer, Ref, Result, Schema } from "effect";
+import { WebMcpToolContainers, type WebMcpToolContainer } from "../schemas/WebMcpTool";
 import { PiContext } from "./PiApi";
-
-const WebMcpToolAnnotation = Schema.Struct({
-  readOnly: Schema.optionalKey(Schema.Boolean),
-  untrustedContent: Schema.optionalKey(Schema.Boolean),
-  autosubmit: Schema.optionalKey(Schema.Boolean),
-});
-
-export const WebMcpToolMetadata = Schema.Struct({
-  targetId: Schema.String,
-  title: Schema.String,
-  url: Schema.String,
-});
-
-export const WebMcpTool = Schema.Struct({
-  name: Schema.String,
-  description: Schema.String,
-  inputSchema: Schema.Unknown,
-  annotations: Schema.optionalKey(WebMcpToolAnnotation),
-  frameId: Schema.String,
-  backendNodeId: Schema.optionalKey(Schema.Number),
-  stackTrace: Schema.optionalKey(Schema.Unknown),
-});
-
-export const WebMcpToolContainer = Schema.Struct({
-  metadata: WebMcpToolMetadata,
-  tool: WebMcpTool,
-});
-
-export type WebMcpToolMetadata = typeof WebMcpToolMetadata.Type;
-export type WebMcpTool = typeof WebMcpTool.Type;
-export type WebMcpToolContainer = typeof WebMcpToolContainer.Type;
-
-const WebMcpToolContainers = Schema.Array(WebMcpToolContainer);
 
 export class ToolStateService extends Context.Service<ToolStateService, {
   readonly stage: (tools: WebMcpToolContainer[]) => Effect.Effect<void>;
@@ -40,7 +8,7 @@ export class ToolStateService extends Context.Service<ToolStateService, {
   readonly commit: Effect.Effect<WebMcpToolContainer[]>;
   readonly committed: Effect.Effect<WebMcpToolContainer[], never, PiContext>;
 }>()("webmcp/ToolStateService") {
-  static readonly layer = Layer.effect(
+  static readonly live = Layer.effect(
     ToolStateService,
     Effect.gen(function* () {
       const stagedRef = yield* Ref.make<WebMcpToolContainer[]>([]);

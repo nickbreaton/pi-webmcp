@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Result, Schema } from "effect";
+import { WebMcpTool, type WebMcpToolContainer } from "../schemas/WebMcpTool";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
-import { WebMcpTool, type WebMcpToolContainer } from "./ToolStateService";
 
 type TargetInfo = { targetId: string; title: string; url: string; type: string };
 
@@ -58,7 +58,7 @@ async function scanTarget(cdp: CdpClient, target: TargetInfo): Promise<WebMcpToo
 export class ToolScanService extends Context.Service<ToolScanService, {
   readonly scan: Effect.Effect<WebMcpToolContainer[], unknown>;
 }>()("webmcp/ToolScanService") {
-  static readonly layer = Layer.effect(
+  static readonly liveWithoutDependencies = Layer.effect(
     ToolScanService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
@@ -72,5 +72,9 @@ export class ToolScanService extends Context.Service<ToolScanService, {
         }),
       });
     }),
+  );
+
+  static readonly live = ToolScanService.liveWithoutDependencies.pipe(
+    Layer.provide(BrowserClient.live),
   );
 }

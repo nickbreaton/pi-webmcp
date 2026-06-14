@@ -16,6 +16,7 @@
     ]
   },
   "include": [
-    ".pi/extensions/**/*.ts"
+    ".pi/extensions/**/*.ts",
+    "src/**/*.ts"
   ]
 }
