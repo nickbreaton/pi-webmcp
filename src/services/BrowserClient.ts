@@ -9,6 +9,7 @@ import { Context, Effect, Layer, Option, Ref, Schema, Scope } from "effect";
 export type CdpClient = Client & {
   send(method: string, params?: any, sessionId?: string): Promise<any>;
   on(method: string, cb: (params: any, sessionId?: string) => void): void;
+  off?(method: string, cb: (params: any, sessionId?: string) => void): void;
 };
 
 const DEFAULT_HOST = process.env.CDP_HOST ?? "127.0.0.1";

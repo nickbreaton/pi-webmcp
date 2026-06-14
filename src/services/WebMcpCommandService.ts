@@ -1,7 +1,8 @@
-import { Context, Effect, Layer, Result, Schema, SchemaTransformation } from "effect";
+import { Context, Effect, Layer, Result, Schema, SchemaTransformation, Stream } from "effect";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { ToolScanService } from "./ToolScanService";
+import { WebMcpDiscoverService } from "./WebMcpDiscoverService";
 
 const Subcommand = Schema.Literals([
   "connect",
@@ -21,6 +22,7 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
       const toolScan = yield* ToolScanService;
+      const discover = yield* WebMcpDiscoverService;
 
       return WebMcpCommandService.of({
         handle: (args) => Effect.gen(function* () {
@@ -59,6 +61,8 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
               ctx.ui.notify(`WebMCP scan failed: ${err instanceof Error ? err.message : err} `, "error");
             })),
           );
+
+          yield* discover.changes.pipe(Stream.runDrain, Effect.forkDetach);
         }),
       });
     }),
@@ -66,5 +70,6 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
 
   static readonly live = WebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provide(ToolScanService.liveWithoutDependencies),
+    Layer.provide(WebMcpDiscoverService.liveWithoutDependencies),
   );
 }
