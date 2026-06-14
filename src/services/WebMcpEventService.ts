@@ -46,6 +46,28 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
             const sessions = new Map<string, string>(); // sessionId -> targetId
             const targets = new Map<string, TargetInfo>();  // targetId -> targetInfo
 
+            const sessionForTarget = (targetId: string) => {
+              for (const [sid, tid] of sessions) {
+                if (tid === targetId) return sid;
+              }
+            };
+
+            const attachTarget = async (targetInfo: TargetInfo) => {
+              if (!isPageTarget(targetInfo)) return;
+              if (sessionForTarget(targetInfo.targetId)) {
+                targets.set(targetInfo.targetId, targetInfo);
+                return;
+              }
+              try {
+                const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: targetInfo.targetId, flatten: true });
+                sessions.set(sessionId, targetInfo.targetId);
+                targets.set(targetInfo.targetId, targetInfo);
+                await cdp.send("WebMCP.enable", {}, sessionId);
+              } catch {
+                // Tab may have closed between discovery and attach
+              }
+            };
+
             const onToolsAdded = (ev: any, evSessionId?: string) => {
               if (!evSessionId) return;
               const targetId = sessions.get(evSessionId);
@@ -80,25 +102,25 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
               }
             };
 
-            const onTargetCreated = async ({ targetInfo }: { targetInfo?: TargetInfo }) => {
-              if (!targetInfo || !isPageTarget(targetInfo)) return;
-              if (targets.has(targetInfo.targetId)) return; // already attached
-              try {
-                const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: targetInfo.targetId, flatten: true });
-                sessions.set(sessionId, targetInfo.targetId);
-                targets.set(targetInfo.targetId, targetInfo);
-                await cdp.send("WebMCP.enable", {}, sessionId);
-              } catch {
-                // Tab may have closed between discovery and attach
-              }
+            const onTargetCreated = ({ targetInfo }: { targetInfo?: TargetInfo }) => {
+              if (!targetInfo) return;
+              void attachTarget(targetInfo);
             };
 
             const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: TargetInfo }) => {
               if (!targetInfo || !isPageTarget(targetInfo)) return;
+              const sessionId = sessionForTarget(targetInfo.targetId);
+              if (!sessionId) {
+                void attachTarget(targetInfo);
+                return;
+              }
+
               const previous = targets.get(targetInfo.targetId);
               if (previous && previous.url !== targetInfo.url) {
                 // URL changed — all tools for this target are gone
                 Queue.offerUnsafe(queue, WebMcpEventTargetDestroyed.make({ targetId: targetInfo.targetId }));
+                // Re-enable WebMCP for the new page so toolsAdded events fire
+                cdp.send("WebMCP.enable", {}, sessionId).catch(() => {});
               }
               targets.set(targetInfo.targetId, targetInfo);
             };
