@@ -4,7 +4,7 @@ import { Effect, Layer, ManagedRuntime, Option } from "effect";
 import { memoize } from "micro-memoize";
 import { BrowserClient, type CdpClient } from "./services/BrowserClient";
 import { PiApi, PiContext } from "./services/PiApi";
-import { WebMcpCommandService } from "./services/WebMcpCommandService";
+import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { Type } from "typebox";
 
 type TargetInfo = { targetId: string; title: string; url: string; type: string };
@@ -260,7 +260,7 @@ function listToolsText(tools: WebMcpTool[]) {
 }
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
-  const live = WebMcpCommandService.live.pipe(
+  const live = PiWebMcpCommandService.live.pipe(
     Layer.provideMerge(Layer.mergeAll(
       Layer.succeed(PiApi, pi),
       Layer.succeed(PiContext, ctx),
@@ -673,7 +673,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
 
 export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext) {
   const runtime = init(pi, ctx);
-  const effect = WebMcpCommandService.use(service => service.handle(args));
+  const effect = PiWebMcpCommandService.use(service => service.handle(args));
 
   await runtime.runPromise(effect);
 }

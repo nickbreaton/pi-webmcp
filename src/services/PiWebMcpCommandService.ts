@@ -14,17 +14,17 @@ const CommandArgs = Schema.String.pipe(
   Schema.decodeTo(Schema.Literals(["", ...Subcommand.literals])),
 );
 
-export class WebMcpCommandService extends Context.Service<WebMcpCommandService, {
+export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandService, {
   readonly handle: (args: string) => Effect.Effect<void, never, PiContext>;
-}>()("webmcp/WebMcpCommandService") {
+}>()("webmcp/PiWebMcpCommandService") {
   static readonly liveWithoutDependencies = Layer.effect(
-    WebMcpCommandService,
+    PiWebMcpCommandService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
       const toolScan = yield* ToolScanService;
       const tools = yield* WebMcpToolsService;
 
-      return WebMcpCommandService.of({
+      return PiWebMcpCommandService.of({
         handle: (args) => Effect.gen(function* () {
           const ctx = yield* PiContext;
 
@@ -75,7 +75,7 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
     }),
   );
 
-  static readonly live = WebMcpCommandService.liveWithoutDependencies.pipe(
+  static readonly live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provide(ToolScanService.liveWithoutDependencies),
     Layer.provide(WebMcpToolsService.live),
   );
