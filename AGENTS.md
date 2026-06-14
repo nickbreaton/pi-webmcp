@@ -9,6 +9,6 @@ Naming convention: anything that passes around or depends on Pi context must be 
 If and only if changes are made to the script or its dependencies do I need to run `/reload` in PI. The user must do this. Trust that the user understands this behavior, lightly prompt after making a change to the script.
 
 Effect runtime boundaries:
-- `runtime.runPromise` is allowed in `.pi/extensions/webmcp/index.ts`.
+- `runtime.runPromise` is allowed in `src/main.ts`.
 - `runtime.runPromise` is banned in every other file.
 - `Effect.runPromise` and `Effect.runFork` are banned everywhere.
