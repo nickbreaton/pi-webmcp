@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Queue, Schema, Stream } from "effect";
+import { Context, Effect, Layer, Queue, Result, Schema, Stream } from "effect";
 import { WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 
@@ -58,7 +58,9 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
             const onToolsAdded = (ev: any, sessionId?: string) => {
               if (!sessionId) return;
               for (const tool of ev.tools ?? []) {
-                Queue.offerUnsafe(queue, WebMcpEventToolAdded.make({ sessionId, tool }));
+                const result = Schema.decodeUnknownResult(WebMcpTool)(tool);
+                if (Result.isFailure(result)) continue;
+                Queue.offerUnsafe(queue, WebMcpEventToolAdded.make({ sessionId, tool: result.success }));
               }
             };
 

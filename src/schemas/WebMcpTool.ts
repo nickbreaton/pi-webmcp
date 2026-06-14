@@ -14,8 +14,9 @@ export class WebMcpToolMetadata extends Schema.Class<WebMcpToolMetadata>("WebMcp
 
 export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   name: Schema.String,
-  description: Schema.String,
-  inputSchema: Schema.Unknown,
+  description: Schema.optionalKey(Schema.String),
+  inputSchema: Schema.optionalKey(Schema.Unknown),
+  outputSchema: Schema.optionalKey(Schema.Unknown),
   annotations: Schema.optionalKey(WebMcpToolAnnotation),
   frameId: Schema.String,
   backendNodeId: Schema.optionalKey(Schema.Number),
