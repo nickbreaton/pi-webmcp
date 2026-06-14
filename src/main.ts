@@ -4,9 +4,13 @@ import { memoize } from "micro-memoize";
 import { BrowserClient } from "./services/BrowserClient";
 import { PiContext } from "./services/PiApi";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
+import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
+import { WebMcpToolsService } from "./services/WebMcpToolsService";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
-  const live = PiWebMcpCommandService.live.pipe(
+  const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
+    Layer.provideMerge(PiWebMcpToolStateService.live),
+    Layer.provideMerge(WebMcpToolsService.live),
     Layer.provideMerge(Layer.mergeAll(
       Layer.succeed(PiContext, ctx),
       BrowserClient.live,
@@ -128,7 +132,22 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   //     },
   //   });
 
-  // TODO: Commit staged Pi WebMCP tool state at the user-message turn boundary.
+  pi.on("message_end", async (event) => {
+    if (event.message.role !== "user") return;
+
+    const tools = await runtime.runPromise(PiWebMcpToolStateService.use(service => service.commit));
+    const messageWithDetails = event.message as typeof event.message & { details?: Record<string, unknown> };
+
+    return {
+      message: {
+        ...event.message,
+        details: {
+          ...messageWithDetails.details,
+          webmcp: { tools },
+        },
+      },
+    };
+  });
 
   pi.on("session_shutdown", async () => {
     await runtime.dispose();
@@ -139,7 +158,10 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
 
 export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext) {
   const runtime = init(pi, ctx);
-  const effect = PiWebMcpCommandService.use(service => service.handle(args));
+
+  const effect = PiWebMcpCommandService.use(service => {
+    return service.handle(args);
+  });
 
   await runtime.runPromise(effect);
 }

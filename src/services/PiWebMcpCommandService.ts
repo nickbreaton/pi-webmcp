@@ -30,7 +30,7 @@ function stableJson(value: unknown): string {
 }
 
 function toolKey(tool: WebMcpTool) {
-  return `${tool.frameId}::${tool.name}::${stableJson(tool.inputSchema)}`;
+  return `${tool.name}::${stableJson(tool.inputSchema)}`;
 }
 
 function diffTools(committed: WebMcpTool[], active: WebMcpTool[]): PiWebMcpToolDiff {

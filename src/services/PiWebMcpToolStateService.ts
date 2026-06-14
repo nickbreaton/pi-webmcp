@@ -4,6 +4,10 @@ import { PiContext } from "./PiApi";
 
 const WebMcpTools = Schema.Array(WebMcpTool);
 
+function decodeTools(value: unknown) {
+  return Schema.decodeUnknownResult(WebMcpTools)(value);
+}
+
 export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateService, {
   readonly stage: (tools: WebMcpTool[]) => Effect.Effect<void>;
   readonly staged: Effect.Effect<WebMcpTool[]>;
@@ -18,11 +22,7 @@ export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateS
       return PiWebMcpToolStateService.of({
         stage: (tools) => Ref.set(stagedRef, tools),
         staged: Ref.get(stagedRef),
-        commit: Effect.gen(function* () {
-          const tools = yield* Ref.get(stagedRef);
-          yield* Ref.set(stagedRef, []);
-          return tools;
-        }),
+        commit: Ref.get(stagedRef),
         committed: Effect.gen(function* () {
           const ctx = yield* PiContext;
           const branch = ctx.sessionManager.getBranch();
@@ -30,10 +30,10 @@ export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateS
           for (let index = branch.length - 1; index >= 0; index--) {
             const entry = branch[index];
             if (entry.type !== "message") continue;
-            if (entry.message?.role !== "toolResult") continue;
-            if (entry.message.toolName !== "webmcp_list") continue;
+            if (entry.message?.role !== "user") continue;
 
-            const result = Schema.decodeUnknownResult(WebMcpTools)(entry.message.details?.tools);
+            const details = entry.message as typeof entry.message & { details?: { webmcp?: { tools?: unknown } } };
+            const result = decodeTools(details.details?.webmcp?.tools);
 
             if (Result.isSuccess(result)) {
               return [...result.success];
