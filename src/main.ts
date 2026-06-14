@@ -149,6 +149,14 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     };
   });
 
+  pi.on('agent_end', async () => {
+    await runtime.runPromise(PiWebMcpCommandService.use(service => service.nudge()));
+  });
+
+  pi.on('session_tree', async () => {
+    await runtime.runPromise(PiWebMcpCommandService.use(service => service.nudge()));
+  });
+
   pi.on("session_shutdown", async () => {
     await runtime.dispose();
   });

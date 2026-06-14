@@ -1,4 +1,4 @@
-import { Context, Effect, Layer, Result, Schema, SchemaTransformation, Stream } from "effect";
+import { Context, Effect, Layer, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
 import { WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
@@ -71,6 +71,7 @@ function formatDiff(diff: PiWebMcpToolDiff) {
 
 export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandService, {
   readonly handle: (args: string) => Effect.Effect<void, never, PiContext>;
+  readonly nudge: () => Effect.Effect<void>;
 }>()("webmcp/PiWebMcpCommandService") {
   static readonly liveWithoutDependencies = Layer.effect(
     PiWebMcpCommandService,
@@ -78,6 +79,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const browser = yield* BrowserClient;
       const toolState = yield* PiWebMcpToolStateService;
       const tools = yield* WebMcpToolsService;
+      const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function* () {
         // TODO: detach active CDP target sessions before disconnecting.
@@ -89,6 +91,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
         const ctx = yield* PiContext;
 
         yield* tools.changes.pipe(
+          Stream.zipLatestWith(SubscriptionRef.changes(nudges), (tools) => tools),
           Stream.tap(active => Effect.gen(function* () {
             yield* toolState.stage(active);
 
@@ -126,6 +129,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
           yield* connect();
         }),
+        nudge: () => SubscriptionRef.set(nudges, Symbol()),
       });
     }),
   );
