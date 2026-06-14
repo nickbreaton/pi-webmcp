@@ -1,35 +1,35 @@
 import { Context, Effect, Layer, Stream } from "effect";
-import { WebMcpToolContainer } from "../schemas/WebMcpTool";
-import { WebMcpEventService, WebMcpEvent, WebMcpEventRemove } from "./WebMcpEventService";
+import { WebMcpTool } from "../schemas/WebMcpTool";
+import { WebMcpEvent, WebMcpEventService, WebMcpEventToolRemoved } from "./WebMcpEventService";
 
-function toolKey(container: WebMcpToolContainer): string {
-  return `${container.metadata.targetId}::${container.tool.frameId}::${container.tool.name}`;
+function toolKey(sessionId: string, tool: WebMcpTool): string {
+  return `${sessionId}::${tool.frameId}::${tool.name}`;
 }
 
-function toolKeyFromRemove(event: typeof WebMcpEventRemove.Type): string {
-  return `${event.targetId}::${event.frameId}::${event.name}`;
+function toolKeyFromRemove(event: typeof WebMcpEventToolRemoved.Type): string {
+  return `${event.sessionId}::${event.frameId}::${event.name}`;
 }
 
-type Registry = Map<string, WebMcpToolContainer>;
+type Registry = Map<string, WebMcpTool>;
 
 function applyEvent(registry: Registry, event: WebMcpEvent): Registry {
   switch (event._tag) {
-    case "WebMcpEventAdd": {
-      const key = toolKey(event.container);
+    case "WebMcpEventToolAdded": {
+      const key = toolKey(event.sessionId, event.tool);
       const next = new Map(registry);
-      next.set(key, event.container);
+      next.set(key, event.tool);
       return next;
     }
-    case "WebMcpEventRemove": {
+    case "WebMcpEventToolRemoved": {
       const key = toolKeyFromRemove(event);
       const next = new Map(registry);
       next.delete(key);
       return next;
     }
-    case "WebMcpEventTargetDestroyed": {
+    case "WebMcpEventSessionCleared": {
       const next = new Map(registry);
-      for (const [key, container] of registry) {
-        if (container.metadata.targetId === event.targetId) {
+      for (const key of registry.keys()) {
+        if (key.startsWith(`${event.sessionId}::`)) {
           next.delete(key);
         }
       }
@@ -38,12 +38,12 @@ function applyEvent(registry: Registry, event: WebMcpEvent): Registry {
   }
 }
 
-function toArray(registry: Registry): WebMcpToolContainer[] {
+function toArray(registry: Registry): WebMcpTool[] {
   return [...registry.values()];
 }
 
 export class WebMcpToolsService extends Context.Service<WebMcpToolsService, {
-  readonly changes: Stream.Stream<WebMcpToolContainer[], never, never>;
+  readonly changes: Stream.Stream<WebMcpTool[], never, never>;
 }>()("webmcp/WebMcpToolsService") {
   static readonly liveWithoutDependencies = Layer.effect(
     WebMcpToolsService,
@@ -52,7 +52,7 @@ export class WebMcpToolsService extends Context.Service<WebMcpToolsService, {
 
       return WebMcpToolsService.of({
         changes: events.changes.pipe(
-          Stream.scan(new Map<string, WebMcpToolContainer>(), applyEvent),
+          Stream.scan(new Map<string, WebMcpTool>(), applyEvent),
           Stream.map(toArray),
         ),
       });

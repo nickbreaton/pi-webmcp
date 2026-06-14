@@ -64,7 +64,7 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
 
           yield* tools.changes.pipe(
             Stream.tap(tools => Effect.sync(() => {
-              const names = tools.map(({ tool }) => tool.name).join(", ") || "none";
+              const names = tools.map(tool => tool.name).join(", ") || "none";
               ctx.ui.notify(`WebMCP tools: ${names}`, "info");
             })),
             Stream.runDrain,
