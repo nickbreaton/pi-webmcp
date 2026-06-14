@@ -1,21 +1,28 @@
-import { Context, Effect, Layer, Schema, Stream } from "effect";
+import { Context, Effect, Layer, Queue, Schema, Stream } from "effect";
 import { WebMcpToolContainer } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 
-export const WebMcpDiscoverAdd = Schema.TaggedStruct("WebMcpDiscoverAdd", {
+export const WebMcpEventAdd = Schema.TaggedStruct("WebMcpEventAdd", {
   container: WebMcpToolContainer,
 });
 
-export const WebMcpDiscoverRemove = Schema.TaggedStruct("WebMcpDiscoverRemove", {
-  id: Schema.String,
+export const WebMcpEventRemove = Schema.TaggedStruct("WebMcpEventRemove", {
+  targetId: Schema.String,
+  frameId: Schema.String,
+  name: Schema.String,
 });
 
-export const WebMcpDiscoverEvent = Schema.Union([
-  WebMcpDiscoverAdd,
-  WebMcpDiscoverRemove,
+export const WebMcpEventTargetDestroyed = Schema.TaggedStruct("WebMcpEventTargetDestroyed", {
+  targetId: Schema.String,
+});
+
+export const WebMcpEvent = Schema.Union([
+  WebMcpEventAdd,
+  WebMcpEventRemove,
+  WebMcpEventTargetDestroyed,
 ]);
 
-export type WebMcpDiscoverEvent = typeof WebMcpDiscoverEvent.Type;
+export type WebMcpEvent = typeof WebMcpEvent.Type;
 
 type TargetInfo = { targetId: string; title: string; url: string; type: string };
 
@@ -23,33 +30,64 @@ function isPageTarget(target: TargetInfo) {
   return target.type === "page" && !target.url.startsWith("chrome://") && !target.url.startsWith("devtools://");
 }
 
-export class WebMcpDiscoverService extends Context.Service<WebMcpDiscoverService, {
-  readonly changes: Stream.Stream<WebMcpDiscoverEvent, never, never>;
-}>()("webmcp/WebMcpDiscoverService") {
+export class WebMcpEventService extends Context.Service<WebMcpEventService, {
+  readonly changes: Stream.Stream<WebMcpEvent, never, never>;
+}>()("webmcp/WebMcpEventService") {
   static readonly liveWithoutDependencies = Layer.effect(
-    WebMcpDiscoverService,
+    WebMcpEventService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
 
       const setup = Effect.gen(function* () {
         const cdp = yield* browser.connect();
 
-        return Stream.callback<WebMcpDiscoverEvent>((queue) => {
+        return Stream.callback<WebMcpEvent>((queue) => {
           return Effect.gen(function* () {
-            const onToolsAdded = (ev: any, _evSessionId?: string) => {
-              console.log("WebMCP.toolsAdded", ev);
+            const sessions = new Map<string, string>(); // sessionId -> targetId
+            const targets = new Map<string, TargetInfo>();  // targetId -> targetInfo
+
+            const onToolsAdded = (ev: any, evSessionId?: string) => {
+              if (!evSessionId) return;
+              const targetId = sessions.get(evSessionId);
+              if (!targetId) return;
+              const target = targets.get(targetId);
+              if (!target) return;
+
+              for (const tool of ev.tools ?? []) {
+                Queue.offerUnsafe(queue, WebMcpEventAdd.make({
+                  container: {
+                    metadata: {
+                      targetId,
+                      title: target.title,
+                      url: target.url,
+                    },
+                    tool,
+                  },
+                }));
+              }
             };
 
-            const onToolsRemoved = (ev: any, _evSessionId?: string) => {
-              console.log("WebMCP.toolsRemoved", ev);
+            const onToolsRemoved = (ev: any, evSessionId?: string) => {
+              if (!evSessionId) return;
+              const targetId = sessions.get(evSessionId);
+              if (!targetId) return;
+
+              for (const removed of ev.tools ?? []) {
+                const name = removed?.name;
+                const frameId = removed?.frameId;
+                if (!name || !frameId) continue;
+                Queue.offerUnsafe(queue, WebMcpEventRemove.make({ targetId, frameId, name }));
+              }
             };
 
             const onTargetCreated = async ({ targetInfo }: { targetInfo?: TargetInfo }) => {
               if (!targetInfo || !isPageTarget(targetInfo)) return;
+              if (targets.has(targetInfo.targetId)) return; // already attached
               try {
                 const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: targetInfo.targetId, flatten: true });
+                sessions.set(sessionId, targetInfo.targetId);
+                targets.set(targetInfo.targetId, targetInfo);
                 await cdp.send("WebMCP.enable", {}, sessionId);
-                console.log("Attached to new target", targetInfo.title);
               } catch {
                 // Tab may have closed between discovery and attach
               }
@@ -57,12 +95,24 @@ export class WebMcpDiscoverService extends Context.Service<WebMcpDiscoverService
 
             const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: TargetInfo }) => {
               if (!targetInfo || !isPageTarget(targetInfo)) return;
-              console.log("Target.targetInfoChanged", targetInfo.title);
+              const previous = targets.get(targetInfo.targetId);
+              if (previous && previous.url !== targetInfo.url) {
+                // URL changed — all tools for this target are gone
+                Queue.offerUnsafe(queue, WebMcpEventTargetDestroyed.make({ targetId: targetInfo.targetId }));
+              }
+              targets.set(targetInfo.targetId, targetInfo);
             };
 
             const onTargetDestroyed = ({ targetId }: { targetId?: string }) => {
               if (!targetId) return;
-              console.log("Target.targetDestroyed", targetId);
+              for (const [sid, tid] of sessions) {
+                if (tid === targetId) {
+                  sessions.delete(sid);
+                  break;
+                }
+              }
+              targets.delete(targetId);
+              Queue.offerUnsafe(queue, WebMcpEventTargetDestroyed.make({ targetId }));
             };
 
             yield* Effect.acquireRelease(
@@ -80,6 +130,8 @@ export class WebMcpDiscoverService extends Context.Service<WebMcpDiscoverService
                 for (const target of pages) {
                   yield* Effect.gen(function* () {
                     const { sessionId } = yield* Effect.tryPromise(() => cdp.send("Target.attachToTarget", { targetId: target.targetId, flatten: true }));
+                    sessions.set(sessionId, target.targetId);
+                    targets.set(target.targetId, target);
                     yield* Effect.tryPromise(() => cdp.send("WebMCP.enable", {}, sessionId));
                   }).pipe(Effect.ignore);
                 }
@@ -96,13 +148,13 @@ export class WebMcpDiscoverService extends Context.Service<WebMcpDiscoverService
         });
       });
 
-      return WebMcpDiscoverService.of({
+      return WebMcpEventService.of({
         changes: Stream.unwrap(setup.pipe(Effect.orDie)),
       });
     }),
   );
 
-  static readonly live = WebMcpDiscoverService.liveWithoutDependencies.pipe(
+  static readonly live = WebMcpEventService.liveWithoutDependencies.pipe(
     Layer.provide(BrowserClient.live),
   );
 }

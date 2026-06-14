@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Result, Schema, SchemaTransformation, Stream } 
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { ToolScanService } from "./ToolScanService";
-import { WebMcpDiscoverService } from "./WebMcpDiscoverService";
+import { WebMcpToolsService } from "./WebMcpToolsService";
 
 const Subcommand = Schema.Literals([
   "connect",
@@ -22,7 +22,7 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
       const toolScan = yield* ToolScanService;
-      const discover = yield* WebMcpDiscoverService;
+      const tools = yield* WebMcpToolsService;
 
       return WebMcpCommandService.of({
         handle: (args) => Effect.gen(function* () {
@@ -62,7 +62,14 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
             })),
           );
 
-          yield* discover.changes.pipe(Stream.runDrain, Effect.forkDetach);
+          yield* tools.changes.pipe(
+            Stream.tap(tools => Effect.sync(() => {
+              const names = tools.map(({ tool }) => tool.name).join(", ") || "none";
+              ctx.ui.notify(`WebMCP tools: ${names}`, "info");
+            })),
+            Stream.runDrain,
+            Effect.forkDetach,
+          );
         }),
       });
     }),
@@ -70,6 +77,6 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
 
   static readonly live = WebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provide(ToolScanService.liveWithoutDependencies),
-    Layer.provide(WebMcpDiscoverService.liveWithoutDependencies),
+    Layer.provide(WebMcpToolsService.live),
   );
 }
