@@ -4,6 +4,7 @@ import { Effect, Layer, ManagedRuntime, Option, Result, Schema, SchemaTransforma
 import { BrowserClient, type CdpClient } from "./BrowserClient";
 import { PiApi, PiContext } from "./PiApi";
 import { WebMcpCommandService } from "./WebMcpCommandService";
+import { ToolScanService } from "./ToolScanService";
 import { Type } from "typebox";
 import { toJsonSchemaDocument } from "effect/SchemaRepresentation";
 import { Connection } from "effect/unstable/sql/SqlConnection";
@@ -673,7 +674,7 @@ export default function webMcpExtension(pi: ExtensionAPI) {
     },
     handler: async (args, ctx) => {
       const effect = WebMcpCommandService.use(service => service.handle(args)).pipe(
-        Effect.provide(WebMcpCommandService.layer),
+        Effect.provide(WebMcpCommandService.layer.pipe(Layer.provide(ToolScanService.layer))),
         Effect.provideService(PiContext, ctx),
       )
       await runtime.runPromise(effect);

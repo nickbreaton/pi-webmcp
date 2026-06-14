@@ -1,6 +1,7 @@
-import { Context, Effect, Layer, Option, Result, Schema, SchemaTransformation } from "effect";
+import { Context, Effect, Layer, Result, Schema, SchemaTransformation } from "effect";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
+import { ToolScanService } from "./ToolScanService";
 
 const Subcommand = Schema.Literals([
   "connect",
@@ -33,10 +34,12 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
     WebMcpCommandService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
-      const ctx = yield* PiContext;
+      const toolScan = yield* ToolScanService;
 
       return WebMcpCommandService.of({
         handle: (args) => Effect.gen(function* () {
+          const ctx = yield* PiContext;
+
           const result = Schema.String.pipe(
             Schema.decode(SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase())),
             Schema.decodeTo(Schema.Literals(["", ...Subcommand.literals])),
@@ -51,8 +54,6 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
           const command = result.success;
 
           if (command === "disconnect") {
-            const cdp = Option.getOrUndefined(yield* browser.get);
-            void cdp;
             // TODO: detach active CDP target sessions before disconnecting.
             yield* browser.disconnect().pipe(Effect.ignore);
             // TODO: reset the command/tool monitor state (`monitoring = false`).
@@ -63,13 +64,17 @@ export class WebMcpCommandService extends Context.Service<WebMcpCommandService, 
 
           // TODO: remember the current Pi context as `lastCtx` for discovery notifications.
           // TODO: if no browser connection exists yet, reset `monitoring = false` before connecting.
-          yield* browser.connect().pipe(
-            // TODO: register `disconnect` and `error` handlers that clear browser/session state.
-            // TODO: run a full WebMCP scan and store discovered tools (`scanAndStore("", true)`).
-            // TODO: notify the user/LLM about discovery diffs after scanning.
-            // TODO: preserve the fallback info notification when the scan finds no new tools.
+          // TODO: register `disconnect` and `error` handlers that clear browser/session state.
+          // TODO: store discovered tools (`scanAndStore("", true)` equivalent).
+          // TODO: notify the user/LLM about discovery diffs after scanning.
+          // TODO: preserve the fallback info notification when the scan finds no new tools.
+          yield* toolScan.scan.pipe(
+            Effect.tap(tools => Effect.sync(() => {
+              const names = tools.map(({ tool }) => tool.name).join(", ") || "none";
+              ctx.ui.notify(`WebMCP scan result: ${names}`, "info");
+            })),
             Effect.catch(err => Effect.sync(() => {
-              ctx.ui.notify(`WebMCP scan failed: ${err.message ?? err} `, "error");
+              ctx.ui.notify(`WebMCP scan failed: ${err instanceof Error ? err.message : err} `, "error");
             })),
           );
         }),
