@@ -5,11 +5,13 @@ import { BrowserClient } from "./services/BrowserClient";
 import { PiContext } from "./services/PiApi";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
+import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provideMerge(PiWebMcpToolStateService.live),
+    Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
     Layer.provideMerge(Layer.mergeAll(
       Layer.succeed(PiContext, ctx),
