@@ -2,12 +2,12 @@
 
 ## Goals
 
-WebMCP tool-state updates need to satisfy four separate concerns:
+WebMCP tool-state updates now use the simplest path:
 
-1. **Persist state for branch reconstruction** so `/tree`, `/resume`, and normal session replay know what tools were committed at a point in history.
-2. **Inform the LLM** when available WebMCP tools change.
-3. **Show a clear user-facing diff** when a tool-state change is committed with a user message.
-4. **Avoid duplicate or stale WebMCP messages** in both the visible history and the LLM feed.
+1. **Persist committed tool state** so `/tree`, `/resume`, and normal session replay can reconstruct which WebMCP tools were available at each user-message boundary.
+2. **Inform the LLM** about the current WebMCP tools through the system prompt before the agent starts.
+3. **Keep user feedback lightweight and continuous** with a notification that remains visible while WebMCP tools are available/changed.
+4. **Avoid extra history rendering** for WebMCP diffs. No custom WebMCP message needs to be inserted or rendered.
 
 ## Session state
 
@@ -25,80 +25,41 @@ The user message details are the durable source of truth for the committed WebMC
 }
 ```
 
-This metadata is for Pi / extension state reconstruction. It is not intended to be shown directly to the LLM.
+This metadata is for Pi / extension state reconstruction. It is not rendered as a separate message and is not the mechanism used to brief the LLM.
 
-## LLM-visible WebMCP messages
+## LLM-visible tool state
 
-When a pending tool-state diff is committed by a user message, insert a custom WebMCP message into history.
+Before the agent starts, inject the current staged WebMCP tool list into the system prompt.
 
-This custom message should:
-
-- use `customType: "webmcp"`
-- include LLM-readable `content` describing the diff
-- include `details` with the structured diff
-- be visible for now, because it is the user-facing record of what changed
-
-Example shape:
+Conceptually:
 
 ```ts
-{
-  customType: "webmcp",
-  content: discoveryContent(diff),
-  display: true,
-  details: {
-    added: diff.added,
-    removed: diff.removed
-  }
-}
+pi.on("before_agent_start", async (event) => {
+  const tools = await getStagedWebMcpTools();
+
+  return {
+    systemPrompt:
+      event.systemPrompt +
+      `\n\nAvailable WebMCP tools: ${tools.map((tool) => tool.name).join(", ")}`,
+  };
+});
 ```
 
-The custom message is how the LLM learns about newly available or removed tools. The user message `details` remain the committed snapshot for reconstruction.
+This means the LLM learns the current WebMCP tool availability directly from the provider request setup. There is no need for synthetic history messages, custom context cleanup, or custom WebMCP message rendering.
 
-## Context cleanup
+## User-visible feedback
 
-Listen to the `context` event and clean up duplicate WebMCP messages in the feed passed to the LLM.
+The `/webmcp connect` flow listens to active WebMCP tool changes, stages the active tool list, compares it to the committed tool snapshot, and emits a Pi notification when that diff is non-empty.
 
-If two `webmcp` custom messages appear consecutively in the context feed, remove the earlier one and keep the later one.
-
-Desired behavior:
+The notification text is:
 
 ```text
-webmcp diff A
-webmcp diff B
-user message
+WebMCP tools changed: new: <added tool names>; removed: <removed tool names>
 ```
 
-becomes:
+Only non-empty sections are included, so an add-only change reports `new: ...` and a remove-only change reports `removed: ...`.
 
-```text
-webmcp diff B
-user message
-```
-
-This avoids stale adjacent WebMCP announcements after `/tree` navigation or repeated pre-user-message commits.
-
-The cleanup is context-only: it should not rewrite the session file. It only controls what the current provider request sees.
-
-## Visible history rendering
-
-Register a custom renderer for `customType: "webmcp"`.
-
-Normal committed WebMCP messages should render as a concise diff summary, with expanded detail available from `message.details`.
-
-However, if a WebMCP custom message is the most recent item in the visible feed and there is no following user message yet, render it as hidden / empty. This prevents the user from seeing a duplicated or premature message while the message has not yet been anchored by a user prompt.
-
-In other words:
-
-- **WebMCP message followed by a user message**: show the committed diff.
-- **WebMCP message at the end of the feed**: hide it with the custom renderer.
-
-## Pending changes before commit
-
-Before the user sends a message, pending WebMCP diffs are not committed to history.
-
-While the user is still typing or the diff is otherwise pending, show the change with a notification / widget instead of inserting a custom message.
-
-This keeps the history clean until there is a real user-message boundary to commit against.
+That notification is the user-facing record of the change. The extension does not create an additional committed custom message for the visible history.
 
 ## Commit flow
 
@@ -106,24 +67,19 @@ This keeps the history clean until there is a real user-message boundary to comm
 Browser WebMCP events update staged tool state
         │
         ▼
-Extension computes staged-vs-committed diff
+Extension computes staged/current tool availability
         │
-        ▼
-If user has not committed a message yet:
-  show notification / widget only
+        ├─ if staged-vs-committed diff is non-empty, emit Pi notification
         │
         ▼
 User sends message
         │
         ├─ attach committed tool snapshot to user message details
         │
-        └─ insert visible custom webmcp message containing the diff
+        └─ before agent starts, inject available WebMCP tools into system prompt
         │
         ▼
-Context hook removes adjacent duplicate webmcp messages from LLM feed
-        │
-        ▼
-LLM sees one current WebMCP diff message plus the user message
+LLM sees current WebMCP tool availability from the system prompt
 ```
 
 ## Responsibilities by mechanism
@@ -131,14 +87,5 @@ LLM sees one current WebMCP diff message plus the user message
 | Mechanism | Purpose | Persistent | LLM-visible | User-visible |
 | --- | --- | --- | --- | --- |
 | User message `details.webmcp.tools` | Committed snapshot / reconstruction | Yes | No | No |
-| Custom `webmcp` message `content` | Tell LLM about the diff | Yes | Yes | Yes, unless renderer hides it |
-| Custom `webmcp` message `details` | Structured diff for renderer/state | Yes | No | Renderer-dependent |
-| `context` hook | Remove duplicate/stale feed entries | No | Affects current request | No |
-| Notification/widget | Pending pre-commit user feedback | No | No | Yes |
-
-## Open implementation notes
-
-- The tool-state service should reconstruct committed state from user message `details.webmcp.tools`.
-- WebMCP custom messages should represent diffs, not the full committed snapshot.
-- The context cleanup should be conservative and only remove adjacent duplicate `webmcp` messages unless a stronger stale-message rule is explicitly needed later.
-- The renderer needs enough context to decide whether a WebMCP message is the most recent visible item. If the renderer API cannot determine that directly, prefer `display: false` for unanchored/pre-commit messages and only send visible messages at commit time.
+| `before_agent_start` system prompt injection | Tell LLM current WebMCP tools | No | Yes | No |
+| Pi notification | User-facing non-empty staged-vs-committed tool diff | Runtime/UI state | No | Yes |
