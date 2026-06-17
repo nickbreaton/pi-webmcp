@@ -22,7 +22,7 @@ export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateS
       return PiWebMcpToolStateService.of({
         stage: (tools) => Ref.set(stagedRef, tools),
         staged: Ref.get(stagedRef),
-        commit: Ref.get(stagedRef),
+        commit: Ref.getAndSet(stagedRef, []),
         committed: Effect.gen(function* () {
           const ctx = yield* PiContext;
           const branch = ctx.sessionManager.getBranch();
