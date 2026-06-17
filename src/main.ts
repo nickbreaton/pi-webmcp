@@ -134,6 +134,14 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   //     },
   //   });
 
+  pi.on('before_agent_start', async (event) => {
+    const tools = await runtime.runPromise(PiWebMcpToolStateService.use(service => service.staged));
+
+    return {
+      systemPrompt: event.systemPrompt + `\n\nAvailable WebMCP tools: ${tools.map(tool => tool.name).join(', ')}`,
+    }
+  });
+
   pi.on("message_end", async (event) => {
     if (event.message.role !== "user") return;
 
