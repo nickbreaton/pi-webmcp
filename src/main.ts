@@ -53,21 +53,21 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   pi.registerTool({
     name: "webmcp_list",
     label: "WebMCP List",
-    description: "Scan open Chrome tabs for WebMCP tools and list known tools grouped by origin.",
-    promptSnippet: "List WebMCP tools exposed by open browser tabs, grouped by origin",
+    description: "List the WebMCP tools currently known to the session, grouped by origin. Does not scan the browser.",
+    promptSnippet: "List WebMCP tools currently known to the session, grouped by origin",
     promptGuidelines: [
-      "For user requests that may involve an open browser page or page-specific action, call webmcp_list before saying no page tool is available.",
-      "Use webmcp_list to get each tool's id, name, origin, and description before calling webmcp_describe or webmcp_execute.",
+      "The available WebMCP tools are already injected into your system prompt each turn; keep a running internal ledger of them and prefer it over calling webmcp_list.",
+      "Only call webmcp_list when you are genuinely confused about which tools are available or need the full grouped listing again; it does not trigger a new browser scan.",
     ],
     parameters: Type.Object({
-      filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter for scanning open tabs." })),
-      refresh: Type.Optional(Type.Boolean({ description: "Force a new scan even if tools are already known. Default: true." })),
+      filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter to narrow the listed tools." })),
+      refresh: Type.Optional(Type.Boolean({ description: "Reserved; the session does not actively scan the browser on call." })),
     }),
     renderCall: (_, theme) => {
       return new Text(`${theme.fg("toolTitle", theme.bold("webmcp_list"))} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`, 0, 0);
     },
     renderResult: (result, { expanded, isPartial }, theme) => {
-      if (isPartial) return new Text(theme.fg("warning", "WebMCP scanning..."), 0, 0);
+      if (isPartial) return new Text(theme.fg("warning", "WebMCP listing..."), 0, 0);
       if (!expanded) return new Text("", 0, 0);
       return new Text(result.content?.find(c => c.type === "text")?.text ?? "", 0, 0);
     },
@@ -119,7 +119,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     const tools = await runtime.runPromise(PiWebMcpToolStateService.use(service => service.staged));
 
     return {
-      systemPrompt: event.systemPrompt + `\n\nAvailable WebMCP tools: ${tools.map(tool => tool.name).join(', ')}`,
+      systemPrompt: event.systemPrompt + `\n\nAvailable WebMCP tools: ${tools.map(tool => tool.name).join(', ')}\n\nKeep a running internal ledger of the WebMCP tools listed above and prefer it over calling webmcp_list. Only call webmcp_list when you are genuinely confused about which tools are available or need the full grouped listing; it does not actively scan the browser.`,
     }
   });
 
