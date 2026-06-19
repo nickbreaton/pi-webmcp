@@ -13,7 +13,7 @@ WebMCP lets a web page expose page-specific tools through the Chrome DevTools Pr
 ## Options
 
 | Option | Default | Description |
-|--------|-------------|
+|--------|---------|-------------|
 | autoConnect | `false` | Automatically connect to Chrome when pi starts |
 | autoDiscover | `true` | Automatically discover WebMCP tools when a tab is opened |
 | allowedOrigins | `null` | List of allowed origins for WebMCP discovery |
