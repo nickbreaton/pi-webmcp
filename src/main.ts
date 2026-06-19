@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { keyHint, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
@@ -6,13 +6,18 @@ import { BrowserClient } from "./services/BrowserClient";
 import { PiContext } from "./services/PiApi";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
+import { PiWebMcpListService } from "./services/PiWebMcpListService";
+import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
+import { Text } from "@earendil-works/pi-tui";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provideMerge(PiWebMcpExecuteService.live),
+    Layer.provideMerge(PiWebMcpListService.live),
+    Layer.provideMerge(PiWebMcpResponseService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),
     Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
@@ -46,34 +51,32 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   // TODO: Re-introduce Pi-facing dynamic tool registration after the Effect services
   // own discovery, invocation, and turn-boundary commits end-to-end.
 
-  // Legacy Pi tool registrations kept here as a reference while dynamic tool registration
-  // is rebuilt on top of the Effect services. Do not uncomment wholesale; the old
-  // implementations depended on deleted scan/registry helpers.
-  //   pi.registerTool({
-  //     name: "webmcp_list",
-  //     label: "WebMCP List",
-  //     description: "Scan open Chrome tabs for WebMCP tools and list known tools grouped by origin.",
-  //     promptSnippet: "List WebMCP tools exposed by open browser tabs, grouped by origin",
-  //     promptGuidelines: [
-  //       "For user requests that may involve an open browser page or page-specific action, call webmcp_list before saying no page tool is available.",
-  //       "Use webmcp_list to get each tool's id, name, origin, and description before calling webmcp_describe or webmcp_execute.",
-  //     ],
-  //     parameters: Type.Object({
-  //       filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter for scanning open tabs." })),
-  //       refresh: Type.Optional(Type.Boolean({ description: "Force a new scan even if tools are already known. Default: true." })),
-  //     }),
-  //     renderCall: renderListCall,
-  //     renderResult: renderListResult,
-  //     async execute(_toolCallId, params) {
-  //       if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false, tools: [] as WebMcpTool[] } };
-  //       if (params.refresh !== false || registry.size === 0) await scanAndStore(params.filter ?? "", true);
-  //       const tools = [...registry.values()].filter(t =>
-  //         !params.filter || t.url.includes(params.filter) || t.title?.includes(params.filter) || t.origin.includes(params.filter) || t.targetId === params.filter
-  //       );
-  //       return { content: [{ type: "text" as const, text: listToolsText(tools) }], details: { connected: true, tools } };
-  //     },
-  //   });
-  //
+  pi.registerTool({
+    name: "webmcp_list",
+    label: "WebMCP List",
+    description: "Scan open Chrome tabs for WebMCP tools and list known tools grouped by origin.",
+    promptSnippet: "List WebMCP tools exposed by open browser tabs, grouped by origin",
+    promptGuidelines: [
+      "For user requests that may involve an open browser page or page-specific action, call webmcp_list before saying no page tool is available.",
+      "Use webmcp_list to get each tool's id, name, origin, and description before calling webmcp_describe or webmcp_execute.",
+    ],
+    parameters: Type.Object({
+      filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter for scanning open tabs." })),
+      refresh: Type.Optional(Type.Boolean({ description: "Force a new scan even if tools are already known. Default: true." })),
+    }),
+    renderCall: (_, theme) => {
+      return new Text(`${theme.fg("toolTitle", theme.bold("webmcp_list"))} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`, 0, 0);
+    },
+    renderResult: (result, { expanded, isPartial }, theme) => {
+      if (isPartial) return new Text(theme.fg("warning", "WebMCP scanning..."), 0, 0);
+      if (!expanded) return new Text("", 0, 0);
+      return new Text(result.content?.find(c => c.type === "text")?.text ?? "", 0, 0);
+    },
+    async execute(_, params) {
+      return runtime.runPromise(PiWebMcpListService.use(service => service.execute(params)));
+    },
+  });
+
   //   pi.registerTool({
   //     name: "webmcp_describe",
   //     label: "WebMCP Describe",
