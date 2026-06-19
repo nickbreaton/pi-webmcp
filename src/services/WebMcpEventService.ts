@@ -67,7 +67,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
               if (!sessionId) return;
               const target = targetBySession.get(sessionId);
               if (!target) throw new Error(`Missing target info for WebMCP session: ${sessionId}`);
-              const origin = target.url.host;
+              const origin = target.url.host
               for (const tool of ev.tools ?? []) {
                 const result = Schema.decodeUnknownResult(WebMcpTool)({ ...tool, origin, sessionId });
                 if (Result.isFailure(result)) continue;
@@ -99,12 +99,16 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
 
             const onTargetCreated = ({ targetInfo }: { targetInfo?: unknown }) => {
               if (!targetInfo) return;
-              void attachTarget(Schema.decodeUnknownSync(TargetInfo)(targetInfo));
+              const result = Schema.decodeUnknownResult(TargetInfo)(targetInfo);
+              if (Result.isFailure(result)) return;
+              void attachTarget(result.success);
             };
 
             const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: unknown }) => {
               if (!targetInfo) return;
-              void attachTarget(Schema.decodeUnknownSync(TargetInfo)(targetInfo));
+              const result = Schema.decodeUnknownResult(TargetInfo)(targetInfo);
+              if (Result.isFailure(result)) return;
+              void attachTarget(result.success);
             };
 
             yield* Effect.acquireRelease(
@@ -119,7 +123,10 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
                 yield* Effect.tryPromise(() => cdp.send("Target.setDiscoverTargets", { discover: true }));
 
                 const { targetInfos } = yield* Effect.tryPromise(() => cdp.send("Target.getTargets"));
-                const pages = targetInfos?.map((targetInfo: unknown) => Schema.decodeUnknownSync(TargetInfo)(targetInfo)).filter(isPageTarget) ?? [];
+                const pages = targetInfos?.flatMap((targetInfo: unknown) => {
+                  const result = Schema.decodeUnknownResult(TargetInfo)(targetInfo);
+                  return Result.isSuccess(result) && isPageTarget(result.success) ? [result.success] : [];
+                }) ?? [];
                 for (const target of pages) {
                   yield* Effect.tryPromise(() => attachTarget(target)).pipe(Effect.ignore);
                 }
