@@ -17,25 +17,18 @@ export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   origin: Schema.optionalKey(Schema.String),
   sessionId: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
-  inputSchema: Schema.optionalKey(Schema.Unknown),
-  outputSchema: Schema.optionalKey(Schema.Unknown),
+  inputSchema: Schema.optionalKey(Schema.Json),
+  outputSchema: Schema.optionalKey(Schema.Json),
   annotations: Schema.optionalKey(WebMcpToolAnnotation),
   frameId: Schema.String,
   backendNodeId: Schema.optionalKey(Schema.Number),
   stackTrace: Schema.optionalKey(Schema.Unknown),
 }) {
-  /**
-   * Stable identity key for diffing. Hashes the tool's identity fields and
-   * intentionally excludes browser-side location fields (`frameId`,
-   * `backendNodeId`, `stackTrace`) which can churn across navigations or
-   * reloads without the tool itself actually changing.
-   *
-   * `Hash.hash` structural-hashes the value deterministically and
-   * order-independently (XOR folding of key/value hashes), and treats
-   * `undefined` consistently, so absent optional fields don't cause spurious
-   * diffs.
-   */
-  get key(): string {
+  get id(): string {
+    return this.name.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
+  }
+
+  get hash(): number {
     return Hash.hash({
       name: this.name,
       origin: this.origin,
@@ -43,7 +36,7 @@ export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
       inputSchema: this.inputSchema,
       outputSchema: this.outputSchema,
       annotations: this.annotations,
-    }).toString();
+    });
   }
 }
 

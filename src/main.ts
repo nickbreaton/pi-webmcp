@@ -5,6 +5,7 @@ import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
 import { PiContext } from "./services/PiApi";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
+import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
@@ -15,6 +16,7 @@ import { Text } from "@earendil-works/pi-tui";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
+    Layer.provideMerge(PiWebMcpDescribeService.live),
     Layer.provideMerge(PiWebMcpExecuteService.live),
     Layer.provideMerge(PiWebMcpListService.live),
     Layer.provideMerge(PiWebMcpResponseService.live),
@@ -48,9 +50,6 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     },
   });
 
-  // TODO: Re-introduce Pi-facing dynamic tool registration after the Effect services
-  // own discovery, invocation, and turn-boundary commits end-to-end.
-
   pi.registerTool({
     name: "webmcp_list",
     label: "WebMCP List",
@@ -77,72 +76,29 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     },
   });
 
-  //   pi.registerTool({
-  //     name: "webmcp_describe",
-  //     label: "WebMCP Describe",
-  //     description: "Describe a WebMCP tool's page, origin, description, and input parameters.",
-  //     promptSnippet: "Inspect a WebMCP page tool schema before executing it; pass the origin from webmcp_list",
-  //     promptGuidelines: [
-  //       "Use webmcp_describe with both tool and origin from webmcp_list when you need a WebMCP tool's exact parameters before execution.",
-  //     ],
-  //     parameters: Type.Object({
-  //       tool: Type.String({ description: "Tool id from webmcp_list, or the page-provided tool name." }),
-  //       origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
-  //     }),
-  //     renderCall: renderDescribeCall,
-  //     renderResult: renderDescribeResult,
-  //     async execute(_toolCallId: string, params: { tool: string; origin: string }): Promise<AgentToolResult<WebMcpDescribeDetails>> {
-  //       if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
-  //       if (registry.size === 0) await scanAndStore("");
-  //       const resolved = resolveTool(params.tool, params.origin);
-  //       if ("candidates" in resolved) {
-  //         return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool.Provide origin.\n\n${listToolsText(resolved.candidates)} ` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates } };
-  //       }
-  //       const id = toolId(resolved);
-  //       const text = `${resolved.description ?? "(no description)"} \n\nParameters: \n${formatSchema(resolved.inputSchema)} `;
-  //       return { content: [{ type: "text" as const, text }], details: { tool: resolved, id } };
-  //     },
-  //   });
-  //
-  //   pi.registerTool({
-  //     name: "webmcp_execute",
-  //     label: "WebMCP Execute",
-  //     description: "Execute a WebMCP tool exposed by an open Chrome tab.",
-  //     promptSnippet: "Execute a selected WebMCP page tool with JSON arguments",
-  //     promptGuidelines: [
-  //       "Before using webmcp_execute, use webmcp_list and usually webmcp_describe to identify the correct tool and parameters.",
-  //       "When calling webmcp_execute, pass both tool and origin from webmcp_list to disambiguate same-named tools on different sites.",
-  //     ],
-  //     parameters: Type.Object({
-  //       tool: Type.String({ description: "Tool id from webmcp_list, or the page-provided tool name." }),
-  //       origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
-  //       args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
-  //     }),
-  //     renderCall: renderExecuteCall,
-  //     renderResult: renderExecuteResult,
-  //     async execute(_toolCallId: string, params: { tool: string; origin: string; args?: string }): Promise<AgentToolResult<WebMcpExecuteDetails>> {
-  //       if (Option.isNone(await runtime.runPromise(BrowserClient.use(browser => browser.get)))) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
-  //       if (registry.size === 0) await scanAndStore("");
-  //       const resolved = resolveTool(params.tool, params.origin);
-  //       if ("candidates" in resolved) {
-  //         return { content: [{ type: "text" as const, text: resolved.candidates.length ? `Ambiguous tool.Retry with origin.\n\n${listToolsText(resolved.candidates)} ` : `Tool not found: ${params.tool}. Try webmcp_list first.` }], details: { candidates: resolved.candidates, error: "tool_not_found_or_ambiguous" } };
-  //       }
-  //       let input: Record<string, unknown> = {};
-  //       if (params.args) {
-  //         input = JSON.parse(params.args);
-  //         if (typeof input !== "object" || input === null || Array.isArray(input)) throw new Error("args must be a JSON object string");
-  //       }
-  //       const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
-  //       if (!cdp) return { content: [{ type: "text" as const, text: webMcpConnectInstruction() }], details: { connected: false } };
-  //       const result = await invokeWebMcpTool(cdp, resolved, input);
-  //       const text = `\nInput: \n${JSON.stringify(input, null, 2)} \n\nResponse: \n${JSON.stringify(result.response, null, 2)} `;
-  //       return {
-  //         content: [{ type: "text" as const, text }],
-  //         details: { id: toolId(resolved), origin: resolved.origin, tool: resolved, input, result },
-  //       };
-  //     },
-  //   });
-  //
+  pi.registerTool({
+    name: "webmcp_describe",
+    label: "WebMCP Describe",
+    description: "Describe a WebMCP tool's page, origin, description, and input parameters.",
+    promptSnippet: "Inspect a WebMCP page tool schema before executing it; pass the origin from webmcp_list",
+    promptGuidelines: [
+      "Use webmcp_describe with both tool and origin from webmcp_list when you need a WebMCP tool's exact parameters before execution.",
+    ],
+    parameters: Type.Object({
+      tool: Type.String({ description: "Tool id from webmcp_list, or the page-provided tool name." }),
+      origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
+    }),
+    renderCall: (args, theme) => {
+      const origin = args.origin ? theme.fg("accent", args.origin) : theme.fg("dim", "unknown origin");
+      const tool = args.tool ? theme.fg("toolOutput", args.tool) : theme.fg("dim", "unknown tool");
+      return new Text(`${theme.fg("toolTitle", theme.bold("webmcp_describe"))} ${origin} ${theme.fg("dim", "→")} ${tool}`, 0, 0);
+    },
+    renderResult: () => new Text("", 0, 0),
+    async execute(_, params) {
+      return runtime.runPromise(PiWebMcpDescribeService.use(service => service.execute(params)));
+    },
+  });
+
   //   pi.registerTool({
   //     name: "webmcp_disconnect",
   //     label: "WebMCP Disconnect",

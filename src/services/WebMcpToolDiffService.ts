@@ -14,12 +14,12 @@ export class WebMcpToolDiffService extends Context.Service<WebMcpToolDiffService
     WebMcpToolDiffService,
     WebMcpToolDiffService.of({
       diff: (previous, next) => {
-        const previousKeys = new Set(previous.map(tool => tool.key));
-        const nextKeys = new Set(next.map(tool => tool.key));
+        const previousHashes = new Set(previous.map(tool => tool.hash));
+        const nextHashes = new Set(next.map(tool => tool.hash));
 
         return {
-          added: next.filter(tool => !previousKeys.has(tool.key)),
-          removed: previous.filter(tool => !nextKeys.has(tool.key)),
+          added: next.filter(tool => !previousHashes.has(tool.hash)),
+          removed: previous.filter(tool => !nextHashes.has(tool.hash)),
         };
       },
       hasDiff: (diff) => diff.added.length > 0 || diff.removed.length > 0,
