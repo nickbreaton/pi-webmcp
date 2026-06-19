@@ -62,8 +62,16 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
         yield* tools.changes.pipe(
           Stream.zipLatestWith(SubscriptionRef.changes(nudges), (tools) => tools),
-          Stream.tap(active => Effect.gen(function* () {
-            yield* toolState.stage(active);
+          // Stage every change immediately so the registry stays current.
+          Stream.tap(active => toolState.stage(active)),
+          // Only notify for the latest change once the agent is idle. If a
+          // newer change arrives while we're waiting, `switchMap` interrupts
+          // the pending notification and restarts with the latest state,
+          // preventing a backlog of queued notifications.
+          Stream.switchMap(active => Stream.fromEffectDrain(Effect.gen(function* () {
+            if ("waitForIdle" in ctx) {
+              yield* Effect.promise(() => ctx.waitForIdle());
+            }
 
             const committed = yield* toolState.committed;
             const diff = toolDiff.diff(committed, active);
@@ -73,7 +81,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
             }
 
             ctx.ui.notify(`WebMCP tools changed: ${formatDiff(diff)}`, "info");
-          })),
+          }))),
           Stream.runDrain,
           Effect.forkDetach,
         );
