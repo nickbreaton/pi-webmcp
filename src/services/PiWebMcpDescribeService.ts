@@ -13,8 +13,6 @@ export type PiWebMcpDescribeParams = {
 export type PiWebMcpDescribeDetails = {
   readonly connected?: boolean;
   readonly id?: string;
-  readonly tool?: unknown;
-  readonly candidates?: unknown;
   readonly error?: string;
 };
 
@@ -80,14 +78,14 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
                   ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}`
                   : `Tool not found: ${params.tool}. Try webmcp_list first.`,
               }],
-              details: { candidates: Formatter.formatJson(Schema.encodeSync(Schema.Array(WebMcpTool))(resolved.candidates)), error: "tool_not_found_or_ambiguous" },
+              details: { error: "tool_not_found_or_ambiguous" },
             };
           }
 
           const id = resolved.id;
           const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
           const text = `${resolved.description ?? "(no description)"}\n\nParameters:\n${inputSchema}`;
-          return { content: [{ type: "text", text }], details: { tool: Formatter.formatJson(Schema.encodeSync(WebMcpTool)(resolved)), id } };
+          return { content: [{ type: "text", text }], details: { id } };
         }),
       });
     }),
