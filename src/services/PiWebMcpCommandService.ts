@@ -75,6 +75,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
             const diff = toolDiff.diff(committed, active);
 
             if (!toolDiff.hasDiff(diff)) {
+              ctx.ui.notify('WebMCP scan shows no updates');
               return;
             }
 
