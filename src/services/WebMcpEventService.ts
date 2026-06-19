@@ -25,18 +25,16 @@ export const WebMcpEvent = Schema.Union([
 
 export type WebMcpEvent = typeof WebMcpEvent.Type;
 
-type TargetInfo = { targetId: string; title: string; url: string; type: string; attached?: boolean };
+class TargetInfo extends Schema.Class<TargetInfo>("TargetInfo")({
+  targetId: Schema.String,
+  title: Schema.String,
+  url: Schema.URLFromString,
+  type: Schema.String,
+  attached: Schema.optionalKey(Schema.Boolean),
+}) { }
 
 function isPageTarget(target: TargetInfo) {
-  return target.type === "page" && !target.url.startsWith("chrome://") && !target.url.startsWith("devtools://");
-}
-
-function originName(url: string) {
-  try {
-    return new URL(url).host;
-  } catch {
-    return url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split("/")[0];
-  }
+  return target.type === "page" && target.url.protocol !== "chrome:" && target.url.protocol !== "devtools:";
 }
 
 export class WebMcpEventService extends Context.Service<WebMcpEventService, {
@@ -68,7 +66,8 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
             const onToolsAdded = (ev: any, sessionId?: string) => {
               if (!sessionId) return;
               const target = targetBySession.get(sessionId);
-              const origin = target ? originName(target.url) : undefined;
+              if (!target) throw new Error(`Missing target info for WebMCP session: ${sessionId}`);
+              const origin = target.url.host;
               for (const tool of ev.tools ?? []) {
                 const result = Schema.decodeUnknownResult(WebMcpTool)({ ...tool, origin, sessionId });
                 if (Result.isFailure(result)) continue;
@@ -89,7 +88,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
             const onFrameNavigated = (ev: any, sessionId?: string) => {
               if (!sessionId || ev.frame?.parentId) return;
               Queue.offerUnsafe(queue, WebMcpEventSessionCleared.make({ sessionId }));
-              cdp.send("WebMCP.enable", {}, sessionId).catch(() => {});
+              cdp.send("WebMCP.enable", {}, sessionId).catch(() => { });
             };
 
             const onDetachedFromTarget = ({ sessionId }: { sessionId?: string }) => {
@@ -98,14 +97,14 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
               Queue.offerUnsafe(queue, WebMcpEventSessionCleared.make({ sessionId }));
             };
 
-            const onTargetCreated = ({ targetInfo }: { targetInfo?: TargetInfo }) => {
+            const onTargetCreated = ({ targetInfo }: { targetInfo?: unknown }) => {
               if (!targetInfo) return;
-              void attachTarget(targetInfo);
+              void attachTarget(Schema.decodeUnknownSync(TargetInfo)(targetInfo));
             };
 
-            const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: TargetInfo }) => {
+            const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: unknown }) => {
               if (!targetInfo) return;
-              void attachTarget(targetInfo);
+              void attachTarget(Schema.decodeUnknownSync(TargetInfo)(targetInfo));
             };
 
             yield* Effect.acquireRelease(
@@ -120,7 +119,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
                 yield* Effect.tryPromise(() => cdp.send("Target.setDiscoverTargets", { discover: true }));
 
                 const { targetInfos } = yield* Effect.tryPromise(() => cdp.send("Target.getTargets"));
-                const pages: TargetInfo[] = targetInfos?.filter(isPageTarget) ?? [];
+                const pages = targetInfos?.map((targetInfo: unknown) => Schema.decodeUnknownSync(TargetInfo)(targetInfo)).filter(isPageTarget) ?? [];
                 for (const target of pages) {
                   yield* Effect.tryPromise(() => attachTarget(target)).pipe(Effect.ignore);
                 }

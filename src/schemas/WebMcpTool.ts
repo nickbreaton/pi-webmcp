@@ -12,9 +12,11 @@ export class WebMcpToolMetadata extends Schema.Class<WebMcpToolMetadata>("WebMcp
   url: Schema.String,
 }) { }
 
+export class Origin extends Schema.asClass(Schema.String.pipe(Schema.brand("Origin"))) { }
+
 export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   name: Schema.String,
-  origin: Schema.optionalKey(Schema.String),
+  origin: Origin,
   sessionId: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
   inputSchema: Schema.optionalKey(Schema.Json),
