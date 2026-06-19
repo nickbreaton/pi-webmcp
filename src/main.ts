@@ -1,15 +1,18 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Effect, Layer, ManagedRuntime } from "effect";
 import { memoize } from "micro-memoize";
+import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
 import { PiContext } from "./services/PiApi";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
+import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
+    Layer.provideMerge(PiWebMcpExecuteService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),
     Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
@@ -20,6 +23,25 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   );
 
   const runtime = ManagedRuntime.make(live);
+
+  pi.registerTool({
+    name: "webmcp_execute",
+    label: "WebMCP Execute",
+    description: "Execute a WebMCP tool exposed by an open Chrome tab.",
+    promptSnippet: "Execute a selected WebMCP page tool with JSON arguments",
+    promptGuidelines: [
+      "Before using webmcp_execute, ask the user to run /webmcp connect if WebMCP is not connected or no matching tool is known.",
+      "When calling webmcp_execute, pass the page-provided tool name or the safe tool id, and include origin when needed to disambiguate same-named tools.",
+    ],
+    parameters: Type.Object({
+      tool: Type.String({ description: "Tool id or page-provided WebMCP tool name." }),
+      origin: Type.Optional(Type.String({ description: "Origin/host where the tool is registered, used to disambiguate same-named tools." })),
+      args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
+    }),
+    async execute(_toolCallId, params) {
+      return runtime.runPromise(PiWebMcpExecuteService.use(service => service.execute(params)));
+    },
+  });
 
   // TODO: Re-introduce Pi-facing dynamic tool registration after the Effect services
   // own discovery, invocation, and turn-boundary commits end-to-end.

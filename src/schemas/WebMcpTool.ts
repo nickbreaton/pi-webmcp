@@ -14,6 +14,8 @@ export class WebMcpToolMetadata extends Schema.Class<WebMcpToolMetadata>("WebMcp
 
 export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   name: Schema.String,
+  origin: Schema.optionalKey(Schema.String),
+  sessionId: Schema.optionalKey(Schema.String),
   description: Schema.optionalKey(Schema.String),
   inputSchema: Schema.optionalKey(Schema.Unknown),
   outputSchema: Schema.optionalKey(Schema.Unknown),
@@ -36,6 +38,7 @@ export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   get key(): string {
     return Hash.hash({
       name: this.name,
+      origin: this.origin,
       description: this.description,
       inputSchema: this.inputSchema,
       outputSchema: this.outputSchema,

@@ -31,6 +31,14 @@ function isPageTarget(target: TargetInfo) {
   return target.type === "page" && !target.url.startsWith("chrome://") && !target.url.startsWith("devtools://");
 }
 
+function originName(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").split("/")[0];
+  }
+}
+
 export class WebMcpEventService extends Context.Service<WebMcpEventService, {
   readonly changes: Stream.Stream<WebMcpEvent, never, never>;
 }>()("webmcp/WebMcpEventService") {
@@ -41,6 +49,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
 
       const setup = Effect.gen(function* () {
         const cdp = yield* browser.connect();
+        const targetBySession = new Map<string, TargetInfo>();
 
         return Stream.callback<WebMcpEvent>((queue) => {
           return Effect.gen(function* () {
@@ -48,6 +57,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
               if (!isPageTarget(target) || target.attached) return;
               try {
                 const { sessionId } = await cdp.send("Target.attachToTarget", { targetId: target.targetId, flatten: true });
+                targetBySession.set(sessionId, target);
                 await cdp.send("Page.enable", {}, sessionId);
                 await cdp.send("WebMCP.enable", {}, sessionId);
               } catch {
@@ -57,8 +67,10 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
 
             const onToolsAdded = (ev: any, sessionId?: string) => {
               if (!sessionId) return;
+              const target = targetBySession.get(sessionId);
+              const origin = target ? originName(target.url) : undefined;
               for (const tool of ev.tools ?? []) {
-                const result = Schema.decodeUnknownResult(WebMcpTool)(tool);
+                const result = Schema.decodeUnknownResult(WebMcpTool)({ ...tool, origin, sessionId });
                 if (Result.isFailure(result)) continue;
                 Queue.offerUnsafe(queue, WebMcpEventToolAdded.make({ sessionId, tool: result.success }));
               }
@@ -82,6 +94,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
 
             const onDetachedFromTarget = ({ sessionId }: { sessionId?: string }) => {
               if (!sessionId) return;
+              targetBySession.delete(sessionId);
               Queue.offerUnsafe(queue, WebMcpEventSessionCleared.make({ sessionId }));
             };
 
