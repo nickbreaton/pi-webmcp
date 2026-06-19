@@ -1,6 +1,6 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
-import { Context, Effect, Layer, Option } from "effect";
-import { WebMcpTool } from "../schemas/WebMcpTool";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
@@ -14,7 +14,7 @@ export type PiWebMcpExecuteParams = {
 export type PiWebMcpExecuteDetails = {
   readonly connected?: boolean;
   readonly id?: string;
-  readonly origin?: string;
+  readonly origin?: Origin;
   readonly tool?: WebMcpTool;
   readonly input?: Record<string, unknown>;
   readonly result?: unknown;
@@ -42,14 +42,13 @@ function listToolsText(tools: WebMcpTool[]) {
     .map((tool) => {
       const id = toolId(tool);
       const name = id === tool.name ? id : `${id} (${tool.name})`;
-      const origin = tool.origin ? ` @ ${tool.origin}` : "";
       const description = tool.description ? `\n    ${tool.description}` : "";
-      return `  - ${name}${origin}${description}`;
+      return `  - ${name} @ ${tool.origin}${description}`;
     })
     .join("\n");
 }
 
-function resolveTool(tools: WebMcpTool[], name: string, origin?: string) {
+function resolveTool(tools: WebMcpTool[], name: string, origin?: Origin) {
   const candidates = tools.filter((tool) =>
     (toolId(tool) === name || tool.name === name) && (!origin || tool.origin === origin),
   );
@@ -128,7 +127,8 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
           }
 
           const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
-          const resolved = resolveTool(activeTools, params.tool, params.origin);
+          const origin = params.origin === undefined ? undefined : Schema.decodeUnknownSync(Origin)(params.origin);
+          const resolved = resolveTool(activeTools, params.tool, origin);
           if ("candidates" in resolved) {
             return textResult(
               resolved.candidates.length > 0

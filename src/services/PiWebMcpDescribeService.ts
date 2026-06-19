@@ -1,6 +1,6 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Formatter, Layer, Option, Schema } from "effect";
-import { WebMcpTool } from "../schemas/WebMcpTool";
+import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
@@ -40,9 +40,8 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
           .map((tool) => {
             const id = tool.id;
             const name = id === tool.name ? id : `${id} (${tool.name})`;
-            const origin = tool.origin ? ` @ ${tool.origin}` : "";
             const description = tool.description ? `\n    ${tool.description}` : "";
-            return `  - ${name}${origin}${description}`;
+            return `  - ${name} @ ${tool.origin}${description}`;
           })
           .join("\n");
       };
@@ -52,7 +51,7 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
       // `Result`/`Option` instead of a `{ candidates }` discriminated object.
       // Needs investigation into whether this and PiWebMcpExecuteService's
       // resolveTool should share one service.
-      const resolveTool = (tools: WebMcpTool[], name: string, origin: string) => {
+      const resolveTool = (tools: WebMcpTool[], name: string, origin: Origin) => {
         const candidates = tools.filter((tool) =>
           (tool.id === name || tool.name === name) && tool.origin === origin,
         );
@@ -71,7 +70,8 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
           }
 
           const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
-          const resolved = resolveTool(activeTools, params.tool, params.origin);
+          const origin = Schema.decodeUnknownSync(Origin)(params.origin);
+          const resolved = resolveTool(activeTools, params.tool, origin);
           if ("candidates" in resolved) {
             return {
               content: [{

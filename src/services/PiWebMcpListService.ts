@@ -16,15 +16,18 @@ function formatToolList(tools: WebMcpTool[]): string {
     return "No WebMCP tools found. Ask the user to run `/webmcp connect` first.";
   }
 
-  const grouped = new Map<string, WebMcpTool[]>();
+  const groups: WebMcpTool[][] = [];
   for (const tool of tools) {
-    const origin = tool.origin ?? "(unknown origin)";
-    const list = grouped.get(origin) ?? [];
-    list.push(tool);
-    grouped.set(origin, list);
+    const group = groups.find((group) => group[0]?.origin === tool.origin);
+    if (group) {
+      group.push(tool);
+    } else {
+      groups.push([tool]);
+    }
   }
 
-  const sections = [...grouped.entries()].map(([origin, list]) => {
+  const sections = groups.map((list) => {
+    const origin = list[0]!.origin;
     const body = list
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((tool) => {
