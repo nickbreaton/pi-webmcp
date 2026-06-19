@@ -1,5 +1,5 @@
 import { keyHint, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Effect, Layer, ManagedRuntime } from "effect";
+import { Effect, Layer, ManagedRuntime, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
@@ -13,6 +13,7 @@ import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { Text } from "@earendil-works/pi-tui";
+import { WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
@@ -134,7 +135,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
         ...event.message,
         details: {
           ...messageWithDetails.details,
-          webmcp: { tools },
+          webmcp: { tools: JSON.parse(JSON.stringify(Schema.encodeSync(WebMcpTools)(tools))) },
         },
       },
     };

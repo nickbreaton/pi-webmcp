@@ -1,5 +1,5 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Formatter, Layer, Option, Schema } from "effect";
 import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
@@ -15,10 +15,10 @@ export type PiWebMcpExecuteDetails = {
   readonly connected?: boolean;
   readonly id?: string;
   readonly origin?: Origin;
-  readonly tool?: WebMcpTool;
+  readonly tool?: unknown;
   readonly input?: Record<string, unknown>;
   readonly result?: unknown;
-  readonly candidates?: WebMcpTool[];
+  readonly candidates?: unknown;
   readonly error?: string;
 };
 
@@ -134,7 +134,7 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
               resolved.candidates.length > 0
                 ? `Ambiguous tool. Retry with origin.\n\n${listToolsText(resolved.candidates)}`
                 : `Tool not found: ${params.tool}. Try /webmcp connect first.`,
-              { candidates: resolved.candidates, error: "tool_not_found_or_ambiguous" },
+              { candidates: Formatter.formatJson(Schema.encodeSync(Schema.Array(WebMcpTool))(resolved.candidates)), error: "tool_not_found_or_ambiguous" },
             );
           }
 
@@ -145,7 +145,7 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
           return textResult(text, {
             id: toolId(resolved),
             origin: resolved.origin,
-            tool: resolved,
+            tool: Formatter.formatJson(Schema.encodeSync(WebMcpTool)(resolved)),
             input,
             result,
           });

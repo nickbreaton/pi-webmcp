@@ -47,4 +47,5 @@ export class WebMcpToolContainer extends Schema.Class<WebMcpToolContainer>("WebM
   tool: WebMcpTool,
 }) { }
 
+export const WebMcpTools = Schema.Array(WebMcpTool);
 export const WebMcpToolContainers = Schema.Array(WebMcpToolContainer);

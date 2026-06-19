@@ -1,12 +1,6 @@
 import { Context, Effect, Layer, Ref, Result, Schema } from "effect";
-import { WebMcpTool } from "../schemas/WebMcpTool";
+import { WebMcpTool, WebMcpTools } from "../schemas/WebMcpTool";
 import { PiContext } from "./PiApi";
-
-const WebMcpTools = Schema.Array(WebMcpTool);
-
-function decodeTools(value: unknown) {
-  return Schema.decodeUnknownResult(WebMcpTools)(value);
-}
 
 export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateService, {
   readonly stage: (tools: WebMcpTool[]) => Effect.Effect<void>;
@@ -33,7 +27,7 @@ export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateS
             if (entry.message?.role !== "user") continue;
 
             const details = entry.message as typeof entry.message & { details?: { webmcp?: { tools?: unknown } } };
-            const result = decodeTools(details.details?.webmcp?.tools);
+            const result = Schema.decodeUnknownResult(WebMcpTools)(details.details?.webmcp?.tools);
 
             if (Result.isSuccess(result)) {
               return [...result.success];
