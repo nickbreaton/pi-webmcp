@@ -69,9 +69,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
           // the pending notification and restarts with the latest state,
           // preventing a backlog of queued notifications.
           Stream.switchMap(active => Stream.fromEffectDrain(Effect.gen(function* () {
-            if ("waitForIdle" in ctx) {
-              yield* Effect.promise(() => ctx.waitForIdle());
-            }
+            yield* Effect.promise(() => ctx.waitForIdle());
 
             const committed = yield* toolState.committed;
             const diff = toolDiff.diff(committed, active);
