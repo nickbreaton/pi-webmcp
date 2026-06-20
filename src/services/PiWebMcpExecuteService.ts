@@ -1,4 +1,4 @@
-import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { highlightCode, type AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
@@ -138,7 +138,9 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
 
           const input = yield* parseInput(params.args);
           const result = yield* invokeWebMcpTool(cdpOption.value, resolved, input);
-          const text = `\nInput:\n${JSON.stringify(input, null, 2)}\n\nResponse:\n${JSON.stringify((result as any).response, null, 2)}`;
+          const inputJson = highlightCode(JSON.stringify(input, null, 2), "json").join("\n");
+          const responseJson = highlightCode(JSON.stringify((result as any).response, null, 2), "json").join("\n");
+          const text = `\n→\n\n${inputJson}\n\n←\n\n${responseJson}`;
 
           return textResult(text, {
             id: toolId(resolved),
