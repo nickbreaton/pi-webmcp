@@ -12,7 +12,7 @@ Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](http
 
 ## First-time Setup
 
-1. Install via npm.
+1. Install this extension via npm.
 
    ```sh
    pi install npm:pi-webmcp
