@@ -85,6 +85,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     parameters: Type.Object({
       filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter to narrow the listed tools." })),
       refresh: Type.Optional(Type.Boolean({ description: "Reserved; the session does not actively scan the browser on call." })),
+      origin: Type.Optional(Type.String({ description: "Optional origin/host to limit results to tools from a single WebMCP page (e.g. example.com)." })),
     }),
     renderCall: (_, theme) => renderPiWebMcpCall(theme, {
       toolName: "webmcp_list",

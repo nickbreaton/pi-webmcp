@@ -1,6 +1,6 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
-import { Context, Effect, Layer, Option } from "effect";
-import { WebMcpTool } from "../schemas/WebMcpTool";
+import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpResponseService } from "./PiWebMcpResponseService";
@@ -9,6 +9,7 @@ import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 export type PiWebMcpListParams = {
   readonly filter?: string;
   readonly refresh?: boolean;
+  readonly origin?: string;
 };
 
 export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
@@ -60,7 +61,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
         return Option.some(`\n${sections.join("\n\n")}`);
       };
 
-      const markdown = Effect.fn("PiWebMcpListService.markdown")(function* (_params: PiWebMcpListParams) {
+      const markdown = Effect.fn("PiWebMcpListService.markdown")(function* (params: PiWebMcpListParams) {
         const cdp = yield* browser.get;
 
         if (Option.isNone(cdp)) {
@@ -70,7 +71,14 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
         const staged = yield* toolState.staged;
         const committed = yield* toolState.committed;
 
-        return formatToolList([...staged, ...committed]);
+        let tools = [...staged, ...committed];
+
+        if (params.origin) {
+          const targetOrigin = Schema.decodeUnknownSync(Origin)(params.origin);
+          tools = tools.filter((tool) => tool.origin === targetOrigin);
+        }
+
+        return formatToolList(tools);
       });
 
       const fallbackMessage = Effect.fn("PiWebMcpListService.fallbackMessage")(function* () {
