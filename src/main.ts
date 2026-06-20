@@ -9,6 +9,7 @@ import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
+import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
@@ -21,6 +22,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiWebMcpExecuteService.live),
     Layer.provideMerge(PiWebMcpListService.live),
     Layer.provideMerge(PiWebMcpResponseService.live),
+    Layer.provideMerge(PiWebMcpSystemPromptService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),
     Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
@@ -119,11 +121,11 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   //   });
 
   pi.on('before_agent_start', async (event) => {
-    const tools = await runtime.runPromise(PiWebMcpToolStateService.use(service => service.staged));
+    const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use(service => service.getSystemPrompt()));
 
     return {
-      systemPrompt: event.systemPrompt + `\n\nAvailable WebMCP tools: ${tools.map(tool => tool.name).join(', ')}\n\nKeep a running internal ledger of the WebMCP tools listed above and prefer it over calling webmcp_list. Only call webmcp_list when you are genuinely confused about which tools are available or need the full grouped listing; it does not actively scan the browser.`,
-    }
+      systemPrompt: event.systemPrompt + `\n\n${prompt}`,
+    };
   });
 
   pi.on("message_end", async (event) => {
