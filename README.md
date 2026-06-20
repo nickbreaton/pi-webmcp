@@ -1,26 +1,37 @@
 # pi-webmcp
 
-A small pi extension that discovers [WebMCP](https://github.com/webmachinelearning/webmcp) tools exposed by open Chrome tabs and registers them as callable pi tools.
+Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](https://github.com/webmachinelearning/webmcp) tools.
 
-## Intent
+> 🚧 Both the WebMCP specification and Chrome’s implementation are in active development. Anticipate breaking changes that affect this extension.
 
-WebMCP lets a web page expose page-specific tools through the Chrome DevTools Protocol. This project bridges those tools into pi so an assistant can:
+> ❗This extension can pose a security risk in its default operating mode once the `/webmcp` command is run. A malicious web page could poison the running Pi session’s context via its tool instructions.
+>
+> Use at your own risk, and consider setting `allowedOrigins` to restrict which pages Pi can connect to.
 
-- scan open browser tabs for WebMCP-capable pages
-- dynamically register discovered page tools
-- invoke those tools from the normal pi tool-calling flow
+## First-time Setup
 
-## Tools
+1. Enable Chrome remote debugging by visiting `chrome://inspect/#remote-debugging`.
 
-| Tool | Description |
-|------|-------------|
-| `webmcp_serve` | Starts a local Effect HTTP static server on first use and returns a URL for a file or folder. Active WebMCP tool origins are listed in the server CORS headers. |
+   ![Chrome remote debugging settings](.github/chrome_enable_remote_debugging.png)
+
+2. Enable the relevant Chrome flags for WebMCP.
+
+   - `chrome://flags/#devtools-webmcp-support`
+   - `chrome://flags/#enable-webmcp-testing`
+
+   ![Chrome WebMCP flags](.github/chrome_webmcp_flags.png)
+
+## Usage
+
+1. Run `/webmcp` and accept the once-per-session confirmation prompt in Chrome.
+
+   ![Chrome remote debugging permission prompt](.github/chrome_allow_remote_debugging.png)
+
+2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo.
 
 ## Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| autoConnect | `false` | Automatically connect to Chrome when pi starts |
-| autoDiscover | `true` | Automatically discover WebMCP tools when a tab is opened |
-| allowedOrigins | `null` | List of allowed origins for WebMCP discovery |
-| disallowOrigins | `[]` | List of disallowed origins for WebMCP discovery |
+| Option | Description |
+|--------|-------------|
+| allowedOrigins | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
+| disallowOrigins | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
