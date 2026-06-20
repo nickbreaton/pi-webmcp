@@ -1,4 +1,4 @@
-import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { highlightCode, type AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Formatter, Layer, Option, Schema } from "effect";
 import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
@@ -84,7 +84,8 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
 
           const id = resolved.id;
           const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
-          const text = `${resolved.description ?? "(no description)"}\n\nParameters:\n${inputSchema}`;
+          const highlightedInputSchema = highlightCode(inputSchema, "json").join("\n");
+          const text = `\n${resolved.description ?? "(no description)"}\n\n${highlightedInputSchema}`;
           return { content: [{ type: "text", text }], details: { id } };
         }),
       });

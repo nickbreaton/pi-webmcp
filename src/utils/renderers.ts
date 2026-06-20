@@ -13,9 +13,12 @@ export const renderPiWebMcpCall = (
 ) => {
   let text = theme.fg("toolTitle", theme.bold(toolName));
 
-  if (origin) {
-    text += ` ${theme.fg("accent", origin)}`;
+  if (!origin) {
+    text += ` ${theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`)}`;
+    return new Text(text, 0, 0);
   }
+
+  text += ` ${theme.fg("accent", origin)}`;
 
   if (webMcpTool) {
     text += ` ${theme.fg("dim", ":")} ${theme.fg("toolOutput", webMcpTool)}`;
