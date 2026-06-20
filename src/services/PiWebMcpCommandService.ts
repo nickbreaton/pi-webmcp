@@ -126,7 +126,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
             yield* Ref.set(notificationShownRef, Option.some(true));
 
-            ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.\n\nRun \`/webmcp list\` to view all.`, "info");
+            ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.`, "info");
           }))),
           Stream.runDrain,
           Effect.forkDetach,

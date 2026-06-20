@@ -37,6 +37,12 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 
 2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo. Find more [here](https://github.com/GoogleChromeLabs/webmcp-tools).
 
+### Commands
+
+- `/webmcp` or `/webmcp connect` — Connect to Chrome and discover WebMCP tools.
+- `/webmcp disconnect` — Disconnect from Chrome WebMCP.
+- `/webmcp list` — Show active WebMCP tools.
+
 ## Options
 
 Configure WebMCP options under the `webmcp` key in Pi settings, either globally in `~/.pi/agent/settings.json` or per trusted project in `.pi/settings.json`:
