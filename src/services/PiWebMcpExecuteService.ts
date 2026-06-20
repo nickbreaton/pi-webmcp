@@ -7,7 +7,7 @@ import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 
 export type PiWebMcpExecuteParams = {
   readonly tool: string;
-  readonly origin?: string;
+  readonly origin: string;
   readonly args?: string;
 };
 
@@ -125,7 +125,7 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
           }
 
           const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
-          const origin = params.origin === undefined ? undefined : Schema.decodeUnknownSync(Origin)(params.origin);
+          const origin = Schema.decodeUnknownSync(Origin)(params.origin);
           const resolved = resolveTool(activeTools, params.tool, origin);
           if ("candidates" in resolved) {
             return textResult(

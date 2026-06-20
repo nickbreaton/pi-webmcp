@@ -1,5 +1,5 @@
-import { keyHint, type ExtensionAPI, type ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Effect, Layer, ManagedRuntime, Schema } from "effect";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { Layer, ManagedRuntime, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
@@ -12,8 +12,7 @@ import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
-import { Text } from "@earendil-works/pi-tui";
-import { renderPiWebMcpCall } from "./utils/renderers";
+import { renderPiWebMcpCall, renderPiWebMcpResult } from "./utils/renderers";
 import { WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
@@ -40,18 +39,20 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     promptSnippet: "Execute a selected WebMCP page tool with JSON arguments",
     promptGuidelines: [
       "Before using webmcp_execute, ask the user to run /webmcp connect if WebMCP is not connected or no matching tool is known.",
-      "When calling webmcp_execute, pass the page-provided tool name or the safe tool id, and include origin when needed to disambiguate same-named tools.",
+      "When calling webmcp_execute, pass the page-provided tool name or the safe tool id, and always include the origin from webmcp_list.",
     ],
     parameters: Type.Object({
       tool: Type.String({ description: "Tool id or page-provided WebMCP tool name." }),
-      origin: Type.Optional(Type.String({ description: "Origin/host where the tool is registered, used to disambiguate same-named tools." })),
+      origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
       args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
     }),
     renderCall: (args, theme) => renderPiWebMcpCall(theme, {
       toolName: "webmcp_execute",
       origin: args.origin,
       webMcpTool: args.tool,
+      arrow: true,
     }),
+    renderResult: renderPiWebMcpResult,
     async execute(_toolCallId, params) {
       return runtime.runPromise(PiWebMcpExecuteService.use(service => service.execute(params)));
     },
@@ -72,13 +73,8 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     }),
     renderCall: (_, theme) => renderPiWebMcpCall(theme, {
       toolName: "webmcp_list",
-      detail: `(${keyHint("app.tools.expand", "to show tools")})`,
     }),
-    renderResult: (result, { expanded, isPartial }, theme) => {
-      if (isPartial) return new Text(theme.fg("warning", "WebMCP listing..."), 0, 0);
-      if (!expanded) return new Text("", 0, 0);
-      return new Text(result.content?.find(c => c.type === "text")?.text ?? "", 0, 0);
-    },
+    renderResult: renderPiWebMcpResult,
     async execute(_, params) {
       return runtime.runPromise(PiWebMcpListService.use(service => service.execute(params)));
     },
@@ -101,7 +97,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       origin: args.origin,
       webMcpTool: args.tool,
     }),
-    renderResult: () => new Text("", 0, 0),
+    renderResult: renderPiWebMcpResult,
     async execute(_, params) {
       return runtime.runPromise(PiWebMcpDescribeService.use(service => service.execute(params)));
     },
