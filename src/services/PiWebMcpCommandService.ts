@@ -16,26 +16,17 @@ const CommandArgs = Schema.String.pipe(
   Schema.decodeTo(Schema.Literals(["", ...Subcommand.literals])),
 );
 
-function toolName(tool: WebMcpTool) {
-  return tool.name;
-}
+function formatAddedOrigins(diff: WebMcpToolDiff) {
+  const counts = new Map<string, number>();
 
-function formatList(items: string[]) {
-  return items.length > 0 ? items.join(", ") : "none";
-}
-
-function formatDiff(diff: WebMcpToolDiff) {
-  const parts: string[] = [];
-
-  if (diff.added.length > 0) {
-    parts.push(`new: ${formatList(diff.added.map(toolName))}`);
+  for (const tool of diff.added) {
+    counts.set(tool.origin, (counts.get(tool.origin) ?? 0) + 1);
   }
 
-  if (diff.removed.length > 0) {
-    parts.push(`removed: ${formatList(diff.removed.map(toolName))}`);
-  }
-
-  return parts.join("; ");
+  return [...counts.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([origin, count]) => `${origin} (${count})`)
+    .join(", ");
 }
 
 export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandService, {
@@ -75,11 +66,13 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
             const diff = toolDiff.diff(committed, active);
 
             if (!toolDiff.hasDiff(diff)) {
-              ctx.ui.notify('WebMCP scan shows no updates');
+              ctx.ui.notify("");
               return;
             }
 
-            ctx.ui.notify(`WebMCP tools changed: ${formatDiff(diff)}`, "info");
+            if (diff.added.length === 0) return;
+
+            ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.\n\nRun \`/webmcp list\` to view all.`, "info");
           }))),
           Stream.runDrain,
           Effect.forkDetach,
