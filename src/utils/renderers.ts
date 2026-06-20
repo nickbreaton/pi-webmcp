@@ -48,3 +48,7 @@ export const renderPiWebMcpMarkdownResult = (
   if (!expanded) return new Text("", 0, 0);
   return new Markdown(getTextResult(result), 0, 0, getMarkdownTheme());
 };
+
+export const renderPiWebMcpListMessage = (message: { readonly content: unknown }) => {
+  return new Markdown(typeof message.content === "string" ? message.content : "", 0, 0, getMarkdownTheme());
+};

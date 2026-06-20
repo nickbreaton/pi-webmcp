@@ -14,10 +14,15 @@ import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { PiTurnRefService } from "./services/PiTurnRefService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
-import { renderPiWebMcpCall, renderPiWebMcpMarkdownResult, renderPiWebMcpResult } from "./utils/renderers";
+import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult } from "./utils/renderers";
 import { WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
+  let currentContext = ctx;
+  const piContext = new Proxy({} as ExtensionCommandContext, {
+    get: (_, property) => currentContext[property as keyof ExtensionCommandContext],
+  });
+
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provideMerge(PiWebMcpDescribeService.live),
     Layer.provideMerge(PiWebMcpExecuteService.live),
@@ -30,12 +35,14 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(WebMcpToolsService.live),
     Layer.provideMerge(Layer.mergeAll(
       Layer.succeed(PiApi, pi),
-      Layer.succeed(PiContext, ctx),
+      Layer.succeed(PiContext, piContext),
       BrowserClient.live,
     )),
   );
 
   const runtime = ManagedRuntime.make(live);
+
+  pi.registerMessageRenderer("webmcp-list", renderPiWebMcpListMessage);
 
   pi.registerTool({
     name: "webmcp_execute",
@@ -127,7 +134,9 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     await runtime.runPromise(PiTurnRefService.use(service => service.reset()))
   });
 
-  pi.on('before_agent_start', async (event) => {
+  pi.on('before_agent_start', async (event, ctx) => {
+    ctx.ui.setWidget("webmcp-list", undefined);
+
     const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use(service => service.getSystemPrompt()));
 
     if (!prompt) return;
@@ -166,11 +175,17 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     await runtime.dispose();
   });
 
-  return runtime;
-});
+  return {
+    runtime,
+    setContext: (ctx: ExtensionCommandContext) => {
+      currentContext = ctx;
+    },
+  };
+}, { transformKey: () => ["pi-webmcp-runtime"] });
 
 export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext) {
-  const runtime = init(pi, ctx);
+  const { runtime, setContext } = init(pi, ctx);
+  setContext(ctx);
 
   const effect = PiWebMcpCommandService.use(service => {
     return service.handle(args);

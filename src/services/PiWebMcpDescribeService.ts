@@ -62,8 +62,8 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
           const cdpOption = yield* browser.get;
           if (Option.isNone(cdpOption)) {
             return {
-              content: [{ type: "text", text: "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` before using WebMCP tools." }],
-              details: { connected: false },
+              content: [{ type: "text", text: "WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools." }],
+              details: {},
             };
           }
 
@@ -78,15 +78,14 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
                   ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}`
                   : `Tool not found: ${params.tool}. Try webmcp_list first.`,
               }],
-              details: { error: "tool_not_found_or_ambiguous" },
+              details: {},
             };
           }
 
-          const id = resolved.id;
           const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
           const highlightedInputSchema = highlightCode(inputSchema, "json").join("\n");
           const text = `\n${resolved.description ?? "(no description)"}\n\n${highlightedInputSchema}`;
-          return { content: [{ type: "text", text }], details: { id } };
+          return { content: [{ type: "text", text }], details: {} };
         }),
       });
     }),

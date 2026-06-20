@@ -33,10 +33,6 @@ function toolId(tool: WebMcpTool) {
   return safeName(tool.name);
 }
 
-function webMcpConnectInstruction() {
-  return "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` before using WebMCP tools.";
-}
-
 function listToolsText(tools: WebMcpTool[]) {
   if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp` first.";
 
@@ -126,7 +122,7 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
         execute: (params) => Effect.gen(function* () {
           const cdpOption = yield* browser.get;
           if (Option.isNone(cdpOption)) {
-            return textResult(webMcpConnectInstruction(), { connected: false });
+            return textResult("WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools.", { connected: false });
           }
 
           const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];

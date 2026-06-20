@@ -1,6 +1,9 @@
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import { Container, Markdown, Spacer } from "@earendil-works/pi-tui";
 import { Context, Effect, Layer, Option, Ref, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
 import { BrowserClient } from "./BrowserClient";
-import { PiContext } from "./PiApi";
+import { PiApi, PiContext } from "./PiApi";
+import { PiWebMcpListService } from "./PiWebMcpListService";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 import { PiTurnRefService } from "./PiTurnRefService";
 import { WebMcpToolDiff, WebMcpToolDiffService } from "./WebMcpToolDiffService";
@@ -9,6 +12,7 @@ import { WebMcpToolsService } from "./WebMcpToolsService";
 const Subcommand = Schema.Literals([
   "connect",
   "disconnect",
+  "list",
 ]);
 
 const CommandArgs = Schema.String.pipe(
@@ -37,7 +41,9 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
     PiWebMcpCommandService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
+      const pi = yield* PiApi;
       const toolState = yield* PiWebMcpToolStateService;
+      const listService = yield* PiWebMcpListService;
       const tools = yield* WebMcpToolsService;
       const toolDiff = yield* WebMcpToolDiffService;
       const turnRefService = yield* PiTurnRefService;
@@ -45,9 +51,38 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function* () {
+        const ctx = yield* PiContext;
+
+        ctx.ui.setWidget("webmcp-list", undefined);
         // TODO: detach active CDP target sessions before disconnecting.
         yield* browser.disconnect().pipe(Effect.ignore);
         yield* toolState.stage([]);
+      });
+
+      const list = Effect.fn("PiWebMcpCommandService.list")(function* () {
+        const ctx = yield* PiContext;
+        const cdp = yield* browser.get;
+
+        if (Option.isNone(cdp)) {
+          ctx.ui.notify("WebMCP: Not connected. Run `/webmcp` first.", "error");
+          return;
+        }
+
+        const text = yield* listService.markdown({});
+
+        if (Option.isNone(text)) {
+          ctx.ui.notify("WebMCP: No tools discovered.", "info");
+          return;
+        }
+
+        const markdownTheme = getMarkdownTheme();
+
+        ctx.ui.setWidget("webmcp-list", () => {
+          const widget = new Container();
+          widget.addChild(new Markdown(text.value, 0, 0, markdownTheme));
+          widget.addChild(new Spacer(1));
+          return widget;
+        });
       });
 
       const connect = Effect.fn("PiWebMcpCommandService.connect")(function* () {
@@ -103,8 +138,11 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
           const command = result.success;
 
           if (command === "disconnect") {
-            yield* disconnect();
-            return;
+            return yield* disconnect();
+          }
+
+          if (command === "list") {
+            return yield* list();
           }
 
           yield* connect();
@@ -115,6 +153,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
   );
 
   static readonly live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
+    Layer.provide(PiWebMcpListService.live),
     Layer.provide(PiWebMcpToolStateService.live),
     Layer.provide(PiTurnRefService.live),
     Layer.provide(WebMcpToolsService.live),
