@@ -1,6 +1,6 @@
 # pi-webmcp
 
-Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](https://github.com/webmachinelearning/webmcp) tools.
+Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](https://github.com/webmachinelearning/webmcp) capabilities.
 
 > [!IMPORTANT]
 > Both the WebMCP specification and Chrome’s implementation are in active development. Anticipate breaking changes that affect this extension.
