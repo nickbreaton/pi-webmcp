@@ -12,11 +12,17 @@ Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](http
 
 ## First-time Setup
 
-1. Enable Chrome remote debugging by visiting `chrome://inspect/#remote-debugging`.
+1. Install via npm.
+
+   ```sh
+   pi install npm:pi-webmcp
+   ```
+
+2. Enable Chrome remote debugging by visiting `chrome://inspect/#remote-debugging`.
 
    ![Chrome remote debugging settings](.github/chrome_enable_remote_debugging.png)
 
-2. Enable the relevant Chrome flags for WebMCP.
+3. Enable the relevant Chrome flags for WebMCP.
 
    - `chrome://flags/#devtools-webmcp-support`
    - `chrome://flags/#enable-webmcp-testing`
@@ -37,3 +43,7 @@ Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](http
 |--------|-------------|
 | allowedOrigins | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
 | disallowOrigins | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
+
+## Browser Support
+
+WebMCP is currently only implemented in Chrome, so this extension is scoped to Chromium-based browsers for now. We plan to support additional browsers if / when they implement WebMCP.
