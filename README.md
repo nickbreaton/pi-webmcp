@@ -10,6 +10,12 @@ WebMCP lets a web page expose page-specific tools through the Chrome DevTools Pr
 - dynamically register discovered page tools
 - invoke those tools from the normal pi tool-calling flow
 
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| `webmcp_serve` | Starts a local Effect HTTP static server on first use and returns a URL for a file or folder. Active WebMCP tool origins are listed in the server CORS headers. |
+
 ## Options
 
 | Option | Default | Description |

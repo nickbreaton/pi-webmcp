@@ -1,4 +1,5 @@
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { NodeHttpServer } from "@effect/platform-node";
 import { Layer, ManagedRuntime, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
@@ -9,6 +10,7 @@ import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
+import { PiWebMcpServeService, type PiWebMcpServeParams } from "./services/PiWebMcpServeService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { PiTurnRefService } from "./services/PiTurnRefService";
@@ -28,6 +30,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiWebMcpExecuteService.live),
     Layer.provideMerge(PiWebMcpListService.live),
     Layer.provideMerge(PiWebMcpResponseService.live),
+    Layer.provideMerge(PiWebMcpServeService.live),
     Layer.provideMerge(PiWebMcpSystemPromptService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),
     Layer.provideMerge(PiTurnRefService.live),
@@ -37,6 +40,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       Layer.succeed(PiApi, pi),
       Layer.succeed(PiContext, piContext),
       BrowserClient.live,
+      NodeHttpServer.layerHttpServices,
     )),
   );
 
@@ -176,4 +180,12 @@ export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionComma
   });
 
   await runtime.runPromise(effect);
+}
+
+export async function serve(pi: ExtensionAPI, params: PiWebMcpServeParams, ctx: ExtensionContext) {
+  const commandContext = ctx as ExtensionCommandContext;
+  const { runtime, setContext } = init(pi, commandContext);
+  setContext(commandContext);
+
+  return runtime.runPromise(PiWebMcpServeService.use(service => service.execute(params)));
 }
