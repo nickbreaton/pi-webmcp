@@ -123,6 +123,8 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   pi.on('before_agent_start', async (event) => {
     const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use(service => service.getSystemPrompt()));
 
+    if (!prompt) return;
+
     return {
       systemPrompt: event.systemPrompt + `\n\n${prompt}`,
     };
