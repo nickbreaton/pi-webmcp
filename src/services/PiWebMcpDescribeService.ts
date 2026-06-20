@@ -1,6 +1,6 @@
 import { highlightCode, type AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Formatter, Layer, Option, Schema } from "effect";
-import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
+import { Origin, ToolId, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
@@ -12,7 +12,7 @@ export type PiWebMcpDescribeParams = {
 
 export type PiWebMcpDescribeDetails = {
   readonly connected?: boolean;
-  readonly id?: string;
+  readonly id?: ToolId;
   readonly error?: string;
 };
 

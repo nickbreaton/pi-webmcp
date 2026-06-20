@@ -1,6 +1,6 @@
 import { highlightCode, type AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Layer, Option, Schema } from "effect";
-import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
+import { Origin, ToolId, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
@@ -13,7 +13,7 @@ export type PiWebMcpExecuteParams = {
 
 export type PiWebMcpExecuteDetails = {
   readonly connected?: boolean;
-  readonly id?: string;
+  readonly id?: ToolId;
   readonly origin?: Origin;
   readonly input?: Record<string, unknown>;
   readonly result?: unknown;
@@ -25,21 +25,13 @@ export class PiWebMcpExecuteError extends Schema.TaggedErrorClass<PiWebMcpExecut
   cause: Schema.Unknown,
 }) { }
 
-function safeName(input: string) {
-  return input.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48) || "tool";
-}
-
-function toolId(tool: WebMcpTool) {
-  return safeName(tool.name);
-}
-
 function listToolsText(tools: WebMcpTool[]) {
   if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp` first.";
 
   return tools
     .sort((a, b) => a.name.localeCompare(b.name))
     .map((tool) => {
-      const id = toolId(tool);
+      const id = tool.id;
       const name = id === tool.name ? id : `${id} (${tool.name})`;
       const description = tool.description ? `\n    ${tool.description}` : "";
       return `  - ${name} @ ${tool.origin}${description}`;
@@ -49,7 +41,7 @@ function listToolsText(tools: WebMcpTool[]) {
 
 function resolveTool(tools: WebMcpTool[], name: string, origin?: Origin) {
   const candidates = tools.filter((tool) =>
-    (toolId(tool) === name || tool.name === name) && (!origin || tool.origin === origin),
+    (tool.id === name || tool.name === name) && (!origin || tool.origin === origin),
   );
 
   return candidates.length === 1 ? candidates[0] : { candidates };
@@ -144,7 +136,7 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
           const text = `\n→\n\n${inputJson}\n\n←\n\n${responseJson}`;
 
           return textResult(text, {
-            id: toolId(resolved),
+            id: resolved.id,
             origin: resolved.origin,
             input,
             result,

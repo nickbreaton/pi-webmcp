@@ -14,6 +14,8 @@ export class WebMcpToolMetadata extends Schema.Class<WebMcpToolMetadata>("WebMcp
 
 export class Origin extends Schema.asClass(Schema.String.pipe(Schema.brand("Origin"))) { }
 
+export class ToolId extends Schema.asClass(Schema.String.pipe(Schema.brand("ToolId"))) { }
+
 export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   name: Schema.String,
   origin: Origin,
@@ -26,8 +28,12 @@ export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   backendNodeId: Schema.optionalKey(Schema.Number),
   stackTrace: Schema.optionalKey(Schema.Unknown),
 }) {
-  get id(): string {
-    return this.name.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48);
+  get id(): ToolId {
+    const transformed = this.name.toLowerCase()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 48);
+    return Schema.decodeSync(ToolId)(transformed);
   }
 
   get hash(): number {
