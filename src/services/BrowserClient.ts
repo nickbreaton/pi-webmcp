@@ -31,6 +31,7 @@ export class BrowserClient extends Context.Service<BrowserClient, {
     Effect.gen(function* () {
       const clientRef = yield* Ref.make<Option.Option<CdpClient>>(Option.none());
       const scope = yield* Effect.scope;
+      const context = yield* Effect.context();
 
       const clear = Ref.set(clientRef, Option.none());
 
@@ -63,9 +64,7 @@ export class BrowserClient extends Context.Service<BrowserClient, {
           }),
         ).pipe(Scope.provide(scope));
 
-        const clearUnsafe = () => Effect.runSync(clear);
-        client.on("disconnect", clearUnsafe);
-        client.on("error", clearUnsafe);
+        client.on("disconnect", () => Effect.runSyncWith(context)(clear));
         yield* Ref.set(clientRef, Option.some(client));
         return client;
       });
