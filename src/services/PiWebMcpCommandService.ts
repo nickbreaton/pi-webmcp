@@ -1,8 +1,8 @@
-import { Context, Effect, Layer, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
-import { WebMcpTool } from "../schemas/WebMcpTool";
+import { Context, Effect, Layer, Option, Ref, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
+import { PiTurnRefService } from "./PiTurnRefService";
 import { WebMcpToolDiff, WebMcpToolDiffService } from "./WebMcpToolDiffService";
 import { WebMcpToolsService } from "./WebMcpToolsService";
 
@@ -40,6 +40,8 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const toolState = yield* PiWebMcpToolStateService;
       const tools = yield* WebMcpToolsService;
       const toolDiff = yield* WebMcpToolDiffService;
+      const turnRefService = yield* PiTurnRefService;
+      const notificationShownRef = yield* turnRefService.make(Option.some(true))
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function* () {
@@ -65,12 +67,20 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
             const committed = yield* toolState.committed;
             const diff = toolDiff.diff(committed, active);
 
-            if (!toolDiff.hasDiff(diff)) {
+            const notificationShown = yield* Ref.get(notificationShownRef).pipe(
+              Effect.map(Option.getOrElse(() => false))
+            )
+
+            if (!toolDiff.hasDiff(diff) && notificationShown) {
               ctx.ui.notify("");
               return;
             }
 
-            if (diff.added.length === 0) return;
+            if (diff.added.length === 0) {
+              return;
+            }
+
+            yield* Ref.set(notificationShownRef, Option.some(true));
 
             ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.\n\nRun \`/webmcp list\` to view all.`, "info");
           }))),
@@ -106,6 +116,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
   static readonly live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provide(PiWebMcpToolStateService.live),
+    Layer.provide(PiTurnRefService.live),
     Layer.provide(WebMcpToolsService.live),
     Layer.provide(WebMcpToolDiffService.live),
   );

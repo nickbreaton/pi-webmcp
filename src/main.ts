@@ -3,7 +3,7 @@ import { Layer, ManagedRuntime, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
-import { PiContext } from "./services/PiApi";
+import { PiApi, PiContext } from "./services/PiApi";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
@@ -11,6 +11,7 @@ import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
+import { PiTurnRefService } from "./services/PiTurnRefService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { renderPiWebMcpCall, renderPiWebMcpMarkdownResult, renderPiWebMcpResult } from "./utils/renderers";
@@ -24,9 +25,11 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiWebMcpResponseService.live),
     Layer.provideMerge(PiWebMcpSystemPromptService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),
+    Layer.provideMerge(PiTurnRefService.live),
     Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
     Layer.provideMerge(Layer.mergeAll(
+      Layer.succeed(PiApi, pi),
       Layer.succeed(PiContext, ctx),
       BrowserClient.live,
     )),
@@ -119,6 +122,10 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   //       return { content: [{ type: "text" as const, text: "WebMCP disconnected and registry cleared." }], details: {} };
   //     },
   //   });
+
+  pi.on('turn_end', async () => {
+    await runtime.runPromise(PiTurnRefService.use(service => service.reset()))
+  });
 
   pi.on('before_agent_start', async (event) => {
     const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use(service => service.getSystemPrompt()));
