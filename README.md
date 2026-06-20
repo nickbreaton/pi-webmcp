@@ -35,7 +35,9 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 
   ![Chrome remote debugging permission prompt](.github/chrome_allow_remote_debugging.png)
 
-2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo. Find more [here](https://github.com/GoogleChromeLabs/webmcp-tools).
+2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo.
+
+   More can be found [here](https://github.com/GoogleChromeLabs/webmcp-tools).
 
 ## Options
 
