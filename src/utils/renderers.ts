@@ -5,13 +5,20 @@ export type PiWebMcpRenderCallOptions = {
   readonly toolName: string;
   readonly origin?: string;
   readonly webMcpTool?: string;
+  readonly target?: string;
 };
 
 export const renderPiWebMcpCall = (
   theme: Theme,
-  { toolName, origin, webMcpTool }: PiWebMcpRenderCallOptions,
+  { toolName, origin, webMcpTool, target }: PiWebMcpRenderCallOptions,
 ) => {
   let text = theme.fg("toolTitle", theme.bold(toolName));
+
+  if (target) {
+    text += ` ${theme.fg("toolOutput", target)}`;
+    text += ` ${theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`)}`;
+    return new Text(text, 0, 0);
+  }
 
   if (!origin) {
     text += ` ${theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`)}`;
@@ -47,6 +54,14 @@ export const renderPiWebMcpMarkdownResult = (
 ) => {
   if (!expanded) return new Text("", 0, 0);
   return new Markdown(getTextResult(result), 0, 0, getMarkdownTheme());
+};
+
+export const renderPiWebMcpServeResult = (
+  result: AgentToolResult<unknown>,
+  { expanded }: ToolRenderResultOptions,
+): Text => {
+  if (!expanded) return new Text("", 0, 0);
+  return new Text(`\n${getTextResult(result)}`, 0, 0);
 };
 
 export const renderPiWebMcpListMessage = (message: { readonly content: unknown }) => {

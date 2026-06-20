@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { renderPiWebMcpCall, renderPiWebMcpServeResult } from "../../src/utils/renderers";
 
 export default function (pi: ExtensionAPI) {
   pi.registerTool({
@@ -15,6 +16,11 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       path: Type.String({ description: "File or directory path to serve. Relative paths resolve from the current Pi working directory." }),
     }),
+    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
+      toolName: "webmcp_serve",
+      target: args.path,
+    }),
+    renderResult: renderPiWebMcpServeResult,
     async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
       const { serve } = await import("../../src/main");
       return serve(pi, params, ctx);
