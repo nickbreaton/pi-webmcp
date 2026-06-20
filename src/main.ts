@@ -12,7 +12,7 @@ import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
-import { renderPiWebMcpCall, renderPiWebMcpResult } from "./utils/renderers";
+import { renderPiWebMcpCall, renderPiWebMcpMarkdownResult, renderPiWebMcpResult } from "./utils/renderers";
 import { WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
@@ -73,7 +73,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     renderCall: (_, theme) => renderPiWebMcpCall(theme, {
       toolName: "webmcp_list",
     }),
-    renderResult: renderPiWebMcpResult,
+    renderResult: renderPiWebMcpMarkdownResult,
     async execute(_, params) {
       return runtime.runPromise(PiWebMcpListService.use(service => service.execute(params)));
     },

@@ -31,14 +31,14 @@ function formatToolList(tools: WebMcpTool[]): string {
     const body = list
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((tool) => {
-        const description = tool.description ? `\n    ${tool.description}` : "";
-        return `  - ${tool.name}${description}`;
+        const description = tool.description ? ` ${tool.description}` : "";
+        return `- **${tool.name}**${description}`;
       })
-      .join("\n");
-    return `${origin}\n${body}`;
+      .join("\n\n");
+    return `${origin}\n\n${body}`;
   });
 
-  return `WebMCP tools grouped by origin:\n\n${sections.join("\n\n")}`;
+  return `\n${sections.join("\n\n")}`;
 }
 
 export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
