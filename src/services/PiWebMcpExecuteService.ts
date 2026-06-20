@@ -20,6 +20,11 @@ export type PiWebMcpExecuteDetails = {
   readonly error?: string;
 };
 
+export class PiWebMcpExecuteError extends Schema.TaggedErrorClass<PiWebMcpExecuteError>()("PiWebMcpExecuteError", {
+  operation: Schema.Union([Schema.Literal("parseInput"), Schema.Literal("invokeTool")]),
+  cause: Schema.Unknown,
+}) { }
+
 function safeName(input: string) {
   return input.toLowerCase().replace(/[^a-z0-9_]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 48) || "tool";
 }
@@ -64,7 +69,7 @@ function parseInput(args: string | undefined) {
       }
       return input as Record<string, unknown>;
     },
-    catch: (cause) => cause,
+    catch: (cause) => new PiWebMcpExecuteError({ operation: "parseInput", cause }),
   });
 }
 
@@ -100,7 +105,7 @@ function invokeWebMcpTool(cdp: CdpClient, tool: WebMcpTool, input: Record<string
       const response = await responsePromise;
       return { invokeResult, response };
     },
-    catch: (cause) => cause,
+    catch: (cause) => new PiWebMcpExecuteError({ operation: "invokeTool", cause }),
   });
 }
 
