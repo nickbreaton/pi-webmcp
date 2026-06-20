@@ -1,14 +1,14 @@
 # pi-webmcp
 
-Integrate Pi’s tool calling with web pages that expose [WebMCP](https://github.com/webmachinelearning/webmcp) capabilities.
+A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [WebMCP](https://github.com/webmachinelearning/webmcp) tools.
 
 > [!IMPORTANT]
 > Both the WebMCP specification and Chrome’s implementation are in active development. Anticipate breaking changes that affect this extension.
 
 > [!CAUTION]
-> This extension can pose a security risk in its default operating mode once the `/webmcp` command is run. A malicious web page could poison the running Pi session’s context via its WebMCP tool instructions.
+> This extension can pose a security risk in its default operating mode once the `/webmcp` command is run. A malicious webpage could poison the running Pi session’s context via its WebMCP tool instructions.
 >
-> Use at your own risk. Consider setting `allowedOrigins` to restrict which web pages Pi can connect to.
+> Use at your own risk. Consider setting `allowedOrigins` to restrict which webpages Pi can connect to.
 
 ## First-time Setup
 
@@ -35,7 +35,7 @@ Integrate Pi’s tool calling with web pages that expose [WebMCP](https://github
 
    ![Chrome remote debugging permission prompt](.github/chrome_allow_remote_debugging.png)
 
-2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo.
+2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo. Find more [here](https://github.com/GoogleChromeLabs/webmcp-tools).
 
 ## Options
 
