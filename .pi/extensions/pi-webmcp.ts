@@ -12,7 +12,7 @@ export default function (pi: ExtensionAPI) {
       return filtered.length > 0 ? filtered : null;
     },
     handler: async (args, ctx) => {
-      const { handle } = await import("../../../src/main");
+      const { handle } = await import("../../src/main");
       await handle(pi, args, ctx);
     },
   });

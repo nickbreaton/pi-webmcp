@@ -18,7 +18,7 @@ export type PiWebMcpDescribeDetails = {
 
 export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeService, {
   readonly execute: (params: PiWebMcpDescribeParams) => Effect.Effect<AgentToolResult<PiWebMcpDescribeDetails>, never, PiContext>;
-}>()("webmcp/PiWebMcpDescribeService") {
+}>()("pi-webmcp/PiWebMcpDescribeService") {
   static readonly live = Layer.effect(
     PiWebMcpDescribeService,
     Effect.gen(function* () {

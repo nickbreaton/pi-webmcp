@@ -32,7 +32,7 @@ function formatAddedOrigins(diff: WebMcpToolDiff) {
 export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandService, {
   readonly handle: (args: string) => Effect.Effect<void, never, PiContext>;
   readonly nudge: () => Effect.Effect<void>;
-}>()("webmcp/PiWebMcpCommandService") {
+}>()("pi-webmcp/PiWebMcpCommandService") {
   static readonly liveWithoutDependencies = Layer.effect(
     PiWebMcpCommandService,
     Effect.gen(function* () {

@@ -43,7 +43,7 @@ function formatToolList(tools: WebMcpTool[]): string {
 
 export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
   readonly execute: (params: PiWebMcpListParams) => Effect.Effect<AgentToolResult<unknown>, never, PiContext>;
-}>()("webmcp/PiWebMcpListService") {
+}>()("pi-webmcp/PiWebMcpListService") {
   static readonly live = Layer.effect(
     PiWebMcpListService,
     Effect.gen(function* () {

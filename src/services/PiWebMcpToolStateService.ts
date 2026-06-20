@@ -7,7 +7,7 @@ export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateS
   readonly staged: Effect.Effect<WebMcpTool[]>;
   readonly commit: Effect.Effect<WebMcpTool[]>;
   readonly committed: Effect.Effect<WebMcpTool[], never, PiContext>;
-}>()("webmcp/PiWebMcpToolStateService") {
+}>()("pi-webmcp/PiWebMcpToolStateService") {
   static readonly live = Layer.effect(
     PiWebMcpToolStateService,
     Effect.gen(function* () {

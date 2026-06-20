@@ -9,7 +9,7 @@ export type WebMcpToolDiff = {
 export class WebMcpToolDiffService extends Context.Service<WebMcpToolDiffService, {
   readonly diff: (previous: WebMcpTool[], next: WebMcpTool[]) => WebMcpToolDiff;
   readonly hasDiff: (diff: WebMcpToolDiff) => boolean;
-}>()("webmcp/WebMcpToolDiffService") {
+}>()("pi-webmcp/WebMcpToolDiffService") {
   static readonly live = Layer.succeed(
     WebMcpToolDiffService,
     WebMcpToolDiffService.of({

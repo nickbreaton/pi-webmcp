@@ -35,7 +35,7 @@ function formatTools(tools: WebMcpTool[], options: { readonly includeDescription
 
 export class PiWebMcpSystemPromptService extends Context.Service<PiWebMcpSystemPromptService, {
   readonly getSystemPrompt: () => Effect.Effect<string | undefined, never, PiContext>;
-}>()("webmcp/PiWebMcpSystemPromptService") {
+}>()("pi-webmcp/PiWebMcpSystemPromptService") {
   static readonly live = Layer.effect(
     PiWebMcpSystemPromptService,
     Effect.gen(function* () {

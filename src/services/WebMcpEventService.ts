@@ -39,7 +39,7 @@ function isPageTarget(target: TargetInfo) {
 
 export class WebMcpEventService extends Context.Service<WebMcpEventService, {
   readonly changes: Stream.Stream<WebMcpEvent, never, never>;
-}>()("webmcp/WebMcpEventService") {
+}>()("pi-webmcp/WebMcpEventService") {
   static readonly liveWithoutDependencies = Layer.effect(
     WebMcpEventService,
     Effect.gen(function* () {

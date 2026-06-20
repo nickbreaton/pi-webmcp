@@ -4,7 +4,7 @@ import { WebMcpEventService } from "./WebMcpEventService";
 
 export class WebMcpToolsService extends Context.Service<WebMcpToolsService, {
   readonly changes: Stream.Stream<WebMcpTool[], never, never>;
-}>()("webmcp/WebMcpToolsService") {
+}>()("pi-webmcp/WebMcpToolsService") {
   static readonly liveWithoutDependencies = Layer.effect(
     WebMcpToolsService,
     Effect.gen(function* () {

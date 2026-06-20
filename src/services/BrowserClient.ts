@@ -25,7 +25,7 @@ export class BrowserClient extends Context.Service<BrowserClient, {
   readonly connect: () => Effect.Effect<CdpClient, BrowserClientError>;
   readonly get: Effect.Effect<Option.Option<CdpClient>>;
   readonly disconnect: () => Effect.Effect<void, BrowserClientError>;
-}>()("webmcp/BrowserClient") {
+}>()("pi-webmcp/BrowserClient") {
   static readonly live = Layer.effect(
     BrowserClient,
     Effect.gen(function* () {

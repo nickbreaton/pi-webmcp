@@ -2,7 +2,7 @@ import { Context, Layer } from "effect";
 
 export class PiWebMcpResponseService extends Context.Service<PiWebMcpResponseService, {
   readonly connectInstruction: string;
-}>()("webmcp/PiWebMcpResponseService") {
+}>()("pi-webmcp/PiWebMcpResponseService") {
   static readonly live = Layer.succeed(
     PiWebMcpResponseService,
     PiWebMcpResponseService.of({

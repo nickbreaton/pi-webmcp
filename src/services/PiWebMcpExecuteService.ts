@@ -110,7 +110,7 @@ function textResult(text: string, details: PiWebMcpExecuteDetails): AgentToolRes
 
 export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteService, {
   readonly execute: (params: PiWebMcpExecuteParams) => Effect.Effect<AgentToolResult<PiWebMcpExecuteDetails>, never, PiContext>;
-}>()("webmcp/PiWebMcpExecuteService") {
+}>()("pi-webmcp/PiWebMcpExecuteService") {
   static readonly live = Layer.effect(
     PiWebMcpExecuteService,
     Effect.gen(function* () {
