@@ -39,10 +39,21 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 
 ## Options
 
+Configure WebMCP options under the `webmcp` key in Pi settings, either globally in `~/.pi/agent/settings.json` or per trusted project in `.pi/settings.json`:
+
+```json
+{
+  "webmcp": {
+    "allowedOrigins": ["googlechromelabs.github.io"],
+    "disallowOrigins": []
+  }
+}
+```
+
 | Option | Description |
 |--------|-------------|
-| allowedOrigins | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
-| disallowOrigins | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
+| `webmcp.allowedOrigins` | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
+| `webmcp.disallowOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
 
 ## Browser Support
 
