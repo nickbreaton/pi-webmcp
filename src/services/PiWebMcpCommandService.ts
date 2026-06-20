@@ -2,7 +2,7 @@ import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer } from "@earendil-works/pi-tui";
 import { Context, Effect, Layer, Option, Ref, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
 import { BrowserClient } from "./BrowserClient";
-import { PiApi, PiContext } from "./PiApi";
+import { PiContext } from "./PiApi";
 import { PiWebMcpListService } from "./PiWebMcpListService";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 import { PiTurnRefService } from "./PiTurnRefService";
@@ -41,13 +41,13 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
     PiWebMcpCommandService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
-      const pi = yield* PiApi;
       const toolState = yield* PiWebMcpToolStateService;
       const listService = yield* PiWebMcpListService;
       const tools = yield* WebMcpToolsService;
       const toolDiff = yield* WebMcpToolDiffService;
       const turnRefService = yield* PiTurnRefService;
       const notificationShownRef = yield* turnRefService.make(Option.some(true))
+      const noToolsNotificationPendingRef = yield* Ref.make(false);
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function* () {
@@ -88,6 +88,18 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const connect = Effect.fn("PiWebMcpCommandService.connect")(function* () {
         const ctx = yield* PiContext;
 
+        const connected = yield* browser.connect().pipe(
+          Effect.as(true),
+          Effect.catchTag('BrowserClientError', Effect.fn(function* () {
+            ctx.ui.notify("WebMCP: Failed to connect to Chrome. Make sure Chrome is open with remote debugging enabled.", "error");
+            return false;
+          }))
+        )
+
+        if (!connected) return;
+
+        yield* Ref.set(noToolsNotificationPendingRef, true);
+
         yield* tools.changes.pipe(
           Stream.zipLatestWith(SubscriptionRef.changes(nudges), (tools) => tools),
           // Stage every change immediately so the registry stays current.
@@ -98,6 +110,13 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
           // preventing a backlog of queued notifications.
           Stream.switchMap(active => Stream.fromEffectDrain(Effect.gen(function* () {
             yield* Effect.promise(() => ctx.waitForIdle());
+
+            const noToolsNotificationPending = yield* Ref.get(noToolsNotificationPendingRef);
+            if (noToolsNotificationPending && active.length === 0) {
+              yield* Ref.set(noToolsNotificationPendingRef, false);
+              ctx.ui.notify("WebMCP: Connected, but no tools were discovered.", "info");
+              return;
+            }
 
             const committed = yield* toolState.committed;
             const diff = toolDiff.diff(committed, active);
@@ -115,6 +134,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
               return;
             }
 
+            yield* Ref.set(noToolsNotificationPendingRef, false);
             yield* Ref.set(notificationShownRef, Option.some(true));
 
             ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.\n\nRun \`/webmcp list\` to view all.`, "info");
