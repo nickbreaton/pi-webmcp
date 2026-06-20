@@ -1,6 +1,6 @@
 @README.md
 
-@.pi/extensions/webmcp/index.ts will be loaded by Pi as an extension so we can test, but also familiarize yourself with its contents as we may want to modify it.
+@.pi/extensions/pi-webmcp.ts will be loaded by Pi as an extension so we can test, but also familiarize yourself with its contents as we may want to modify it.
 
 When interacting with WebMCP pages through Chrome DevTools Protocol, only use the DevTools `WebMCP.*` commands/events. Do not use `Runtime.evaluate` or other CDP commands to inspect, patch, mutate, or execute JavaScript in the page context.
 
