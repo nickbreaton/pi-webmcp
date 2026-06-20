@@ -2,11 +2,13 @@
 
 Integrate Pi’s tool-calling abilities with web pages that expose [WebMCP](https://github.com/webmachinelearning/webmcp) tools.
 
-> 🚧 Both the WebMCP specification and Chrome’s implementation are in active development. Anticipate breaking changes that affect this extension.
+> [!IMPORTANT]
+> Both the WebMCP specification and Chrome’s implementation are in active development. Anticipate breaking changes that affect this extension.
 
-> ❗This extension can pose a security risk in its default operating mode once the `/webmcp` command is run. A malicious web page could poison the running Pi session’s context via its tool instructions.
+> [!CAUTION]
+> This extension can pose a security risk in its default operating mode once the `/webmcp` command is run. A malicious web page could poison the running Pi session’s context via its WebMCP tool instructions.
 >
-> Use at your own risk, and consider setting `allowedOrigins` to restrict which pages Pi can connect to.
+> Use at your own risk. Consider setting `allowedOrigins` to restrict which web pages Pi can connect to.
 
 ## First-time Setup
 
