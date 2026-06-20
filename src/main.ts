@@ -114,22 +114,6 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     },
   });
 
-  //   pi.registerTool({
-  //     name: "webmcp_disconnect",
-  //     label: "WebMCP Disconnect",
-  //     description: "Disconnect from Chrome remote debugging and clear known WebMCP tools.",
-  //     parameters: Type.Object({}),
-  //     async execute() {
-  //       const cdp = Option.getOrUndefined(await runtime.runPromise(BrowserClient.use(browser => browser.get)));
-  //       if (cdp) await detachSessions(cdp);
-  //       await runtime.runPromise(BrowserClient.use(browser => browser.disconnect()));
-  //       monitoring = false;
-  //       registry.clear();
-  //       registryCurrent = false;
-  //       return { content: [{ type: "text" as const, text: "WebMCP disconnected and registry cleared." }], details: {} };
-  //     },
-  //   });
-
   pi.on('turn_end', async () => {
     await runtime.runPromise(PiTurnRefService.use(service => service.reset()))
   });
