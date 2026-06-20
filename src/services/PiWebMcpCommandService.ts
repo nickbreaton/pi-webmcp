@@ -98,8 +98,6 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
         if (!connected) return;
 
-        yield* Ref.set(noToolsNotificationPendingRef, true);
-
         yield* tools.changes.pipe(
           Stream.zipLatestWith(SubscriptionRef.changes(nudges), (tools) => tools),
           // Stage every change immediately so the registry stays current.
@@ -110,13 +108,6 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
           // preventing a backlog of queued notifications.
           Stream.switchMap(active => Stream.fromEffectDrain(Effect.gen(function* () {
             yield* Effect.promise(() => ctx.waitForIdle());
-
-            const noToolsNotificationPending = yield* Ref.get(noToolsNotificationPendingRef);
-            if (noToolsNotificationPending && active.length === 0) {
-              yield* Ref.set(noToolsNotificationPendingRef, false);
-              ctx.ui.notify("WebMCP: Connected, but no tools were discovered.", "info");
-              return;
-            }
 
             const committed = yield* toolState.committed;
             const diff = toolDiff.diff(committed, active);
@@ -134,7 +125,6 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
               return;
             }
 
-            yield* Ref.set(noToolsNotificationPendingRef, false);
             yield* Ref.set(notificationShownRef, Option.some(true));
 
             ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.\n\nRun \`/webmcp list\` to view all.`, "info");

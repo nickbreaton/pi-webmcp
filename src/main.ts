@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { NodeHttpServer } from "@effect/platform-node";
-import { Layer, ManagedRuntime, Schema } from "effect";
+import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
@@ -139,6 +139,8 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     if (event.message.role !== "user") return;
 
     const tools = await runtime.runPromise(PiWebMcpToolStateService.use(service => service.commit));
+    if (Option.isNone(tools)) return;
+
     const messageWithDetails = event.message as typeof event.message & { details?: Record<string, unknown> };
 
     return {
@@ -146,7 +148,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
         ...event.message,
         details: {
           ...messageWithDetails.details,
-          webmcp: { tools: JSON.parse(JSON.stringify(Schema.encodeSync(WebMcpTools)(tools))) },
+          webmcp: { tools: JSON.parse(JSON.stringify(Schema.encodeSync(WebMcpTools)(tools.value))) },
         },
       },
     };
