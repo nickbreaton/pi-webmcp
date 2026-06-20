@@ -45,7 +45,6 @@ Configure WebMCP options under the `webmcp` key in Pi settings, either globally 
 {
   "webmcp": {
     "allowedOrigins": ["googlechromelabs.github.io"],
-    "disallowOrigins": []
   }
 }
 ```
