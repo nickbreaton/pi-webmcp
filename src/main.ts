@@ -50,7 +50,6 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       toolName: "webmcp_execute",
       origin: args.origin,
       webMcpTool: args.tool,
-      arrow: true,
     }),
     renderResult: renderPiWebMcpResult,
     async execute(_toolCallId, params) {

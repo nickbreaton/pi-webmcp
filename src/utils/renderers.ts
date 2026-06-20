@@ -5,14 +5,12 @@ export type PiWebMcpRenderCallOptions = {
   readonly toolName: string;
   readonly origin?: string;
   readonly webMcpTool?: string;
-  readonly arrow?: boolean;
-  readonly detail?: string;
 };
 
 export const renderPiWebMcpCall = (
   theme: Theme,
-  { toolName, origin, webMcpTool, arrow = false, detail }: PiWebMcpRenderCallOptions,
-): Text => {
+  { toolName, origin, webMcpTool }: PiWebMcpRenderCallOptions,
+) => {
   let text = theme.fg("toolTitle", theme.bold(toolName));
 
   if (origin) {
@@ -20,13 +18,7 @@ export const renderPiWebMcpCall = (
   }
 
   if (webMcpTool) {
-    text += arrow
-      ? ` ${theme.fg("dim", "→")} ${theme.fg("toolOutput", webMcpTool)}`
-      : ` ${theme.fg("toolOutput", webMcpTool)}`;
-  }
-
-  if (detail) {
-    text += ` ${theme.fg("dim", detail)}`;
+    text += ` ${theme.fg("dim", ":")} ${theme.fg("toolOutput", webMcpTool)}`;
   }
 
   text += ` ${theme.fg("dim", `(${keyText("app.tools.expand")} to expand)`)}`;
