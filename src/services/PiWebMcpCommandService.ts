@@ -47,7 +47,6 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const toolDiff = yield* WebMcpToolDiffService;
       const turnRefService = yield* PiTurnRefService;
       const notificationShownRef = yield* turnRefService.make(Option.some(true))
-      const noToolsNotificationPendingRef = yield* Ref.make(false);
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function* () {
