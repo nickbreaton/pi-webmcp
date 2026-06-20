@@ -29,11 +29,11 @@ function toolId(tool: WebMcpTool) {
 }
 
 function webMcpConnectInstruction() {
-  return "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` (or `/webmcp connect`) before using WebMCP tools.";
+  return "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` before using WebMCP tools.";
 }
 
 function listToolsText(tools: WebMcpTool[]) {
-  if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp connect` first.";
+  if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp` first.";
 
   return tools
     .sort((a, b) => a.name.localeCompare(b.name))
@@ -71,7 +71,7 @@ function parseInput(args: string | undefined) {
 function invokeWebMcpTool(cdp: CdpClient, tool: WebMcpTool, input: Record<string, unknown>) {
   return Effect.tryPromise({
     try: async () => {
-      if (!tool.sessionId) throw new Error("WebMCP tool is missing its CDP session id. Re-run `/webmcp connect` and try again.");
+      if (!tool.sessionId) throw new Error("WebMCP tool is missing its CDP session id. Re-run `/webmcp` and try again.");
 
       let invocationId: string | undefined;
       const responsePromise = new Promise<unknown>((resolve, reject) => {
@@ -131,7 +131,7 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
             return textResult(
               resolved.candidates.length > 0
                 ? `Ambiguous tool. Retry with origin.\n\n${listToolsText(resolved.candidates)}`
-                : `Tool not found: ${params.tool}. Try /webmcp connect first.`,
+                : `Tool not found: ${params.tool}. Try /webmcp first.`,
               { error: "tool_not_found_or_ambiguous" },
             );
           }

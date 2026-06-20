@@ -43,7 +43,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     description: "Execute a WebMCP tool exposed by an open Chrome tab.",
     promptSnippet: "Execute a selected WebMCP page tool with JSON arguments",
     promptGuidelines: [
-      "Before using webmcp_execute, ask the user to run /webmcp connect if WebMCP is not connected or no matching tool is known.",
+      "Before using webmcp_execute, ask the user to run /webmcp if WebMCP is not connected or no matching tool is known.",
       "When calling webmcp_execute, pass the page-provided tool name or the safe tool id, and always include the origin from webmcp_list.",
     ],
     parameters: Type.Object({

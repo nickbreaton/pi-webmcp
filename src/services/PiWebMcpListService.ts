@@ -13,7 +13,7 @@ export type PiWebMcpListParams = {
 
 function formatToolList(tools: WebMcpTool[]): string {
   if (tools.length === 0) {
-    return "No WebMCP tools found. Ask the user to run `/webmcp connect` first.";
+    return "No WebMCP tools found. Ask the user to run `/webmcp` first.";
   }
 
   const groups: WebMcpTool[][] = [];

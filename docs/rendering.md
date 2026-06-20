@@ -49,7 +49,7 @@ This means the LLM learns the current WebMCP tool availability directly from the
 
 ## User-visible feedback
 
-The `/webmcp connect` flow listens to active WebMCP tool changes, stages the active tool list, compares it to the committed tool snapshot, and emits a Pi notification when that diff is non-empty.
+The `/webmcp` flow listens to active WebMCP tool changes, stages the active tool list, compares it to the committed tool snapshot, and emits a Pi notification when that diff is non-empty.
 
 The notification text is:
 

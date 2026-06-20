@@ -6,7 +6,7 @@ export class PiWebMcpResponseService extends Context.Service<PiWebMcpResponseSer
   static readonly live = Layer.succeed(
     PiWebMcpResponseService,
     PiWebMcpResponseService.of({
-      connectInstruction: "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` (or `/webmcp connect`) before using WebMCP tools.",
+      connectInstruction: "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` before using WebMCP tools.",
     }),
   );
 }

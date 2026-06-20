@@ -31,7 +31,7 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
       // / Formatter.formatJson usage and whether grouping by origin belongs
       // in a dedicated service.
       const listToolsText = (tools: WebMcpTool[]) => {
-        if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp connect` first.";
+        if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp` first.";
 
         return tools
           .sort((a, b) => a.name.localeCompare(b.name))
@@ -62,7 +62,7 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
           const cdpOption = yield* browser.get;
           if (Option.isNone(cdpOption)) {
             return {
-              content: [{ type: "text", text: "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` (or `/webmcp connect`) before using WebMCP tools." }],
+              content: [{ type: "text", text: "WebMCP is not connected to Chrome. Ask the user to run `/webmcp` before using WebMCP tools." }],
               details: { connected: false },
             };
           }
