@@ -13,6 +13,7 @@ import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { Text } from "@earendil-works/pi-tui";
+import { renderPiWebMcpCall } from "./utils/renderers";
 import { WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
@@ -46,6 +47,11 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       origin: Type.Optional(Type.String({ description: "Origin/host where the tool is registered, used to disambiguate same-named tools." })),
       args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
     }),
+    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
+      toolName: "webmcp_execute",
+      origin: args.origin,
+      webMcpTool: args.tool,
+    }),
     async execute(_toolCallId, params) {
       return runtime.runPromise(PiWebMcpExecuteService.use(service => service.execute(params)));
     },
@@ -64,9 +70,10 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       filter: Type.Optional(Type.String({ description: "Optional URL/title/target/origin filter to narrow the listed tools." })),
       refresh: Type.Optional(Type.Boolean({ description: "Reserved; the session does not actively scan the browser on call." })),
     }),
-    renderCall: (_, theme) => {
-      return new Text(`${theme.fg("toolTitle", theme.bold("webmcp_list"))} ${theme.fg("dim", `(${keyHint("app.tools.expand", "to show tools")})`)}`, 0, 0);
-    },
+    renderCall: (_, theme) => renderPiWebMcpCall(theme, {
+      toolName: "webmcp_list",
+      detail: `(${keyHint("app.tools.expand", "to show tools")})`,
+    }),
     renderResult: (result, { expanded, isPartial }, theme) => {
       if (isPartial) return new Text(theme.fg("warning", "WebMCP listing..."), 0, 0);
       if (!expanded) return new Text("", 0, 0);
@@ -89,11 +96,11 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       tool: Type.String({ description: "Tool id from webmcp_list, or the page-provided tool name." }),
       origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
     }),
-    renderCall: (args, theme) => {
-      const origin = args.origin ? theme.fg("accent", args.origin) : theme.fg("dim", "unknown origin");
-      const tool = args.tool ? theme.fg("toolOutput", args.tool) : theme.fg("dim", "unknown tool");
-      return new Text(`${theme.fg("toolTitle", theme.bold("webmcp_describe"))} ${origin} ${theme.fg("dim", "→")} ${tool}`, 0, 0);
-    },
+    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
+      toolName: "webmcp_describe",
+      origin: args.origin,
+      webMcpTool: args.tool,
+    }),
     renderResult: () => new Text("", 0, 0),
     async execute(_, params) {
       return runtime.runPromise(PiWebMcpDescribeService.use(service => service.execute(params)));
