@@ -22,7 +22,7 @@ export class BrowserClientError extends Schema.TaggedErrorClass<BrowserClientErr
 }) { }
 
 export class BrowserClient extends Context.Service<BrowserClient, {
-  readonly connect: () => Effect.Effect<CdpClient, BrowserClientError>;
+  readonly connect: (options?: { readonly force?: boolean }) => Effect.Effect<CdpClient, BrowserClientError>;
   readonly get: Effect.Effect<Option.Option<CdpClient>>;
   readonly disconnect: () => Effect.Effect<void, BrowserClientError>;
 }>()("pi-webmcp/BrowserClient") {
@@ -34,9 +34,18 @@ export class BrowserClient extends Context.Service<BrowserClient, {
 
       const clear = Ref.set(clientRef, Option.none());
 
-      const connect = Effect.fn("BrowserClient.connect")(function* () {
+      const connect = Effect.fn("BrowserClient.connect")(function* (options?: { readonly force?: boolean }) {
         const existing = yield* Ref.get(clientRef);
-        if (Option.isSome(existing)) return existing.value;
+
+        if (Option.isSome(existing)) {
+          if (!options?.force) return existing.value;
+
+          yield* Ref.set(clientRef, Option.none());
+          yield* Effect.tryPromise({
+            try: () => existing.value.close(),
+            catch: (cause) => new BrowserClientError({ operation: "disconnect", cause }),
+          }).pipe(Effect.ignore);
+        }
 
         const client = yield* Effect.acquireRelease(
           Effect.tryPromise({

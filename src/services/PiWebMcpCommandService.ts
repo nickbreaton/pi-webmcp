@@ -88,7 +88,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const connect = Effect.fn("PiWebMcpCommandService.connect")(function* () {
         const ctx = yield* PiContext;
 
-        const connected = yield* browser.connect().pipe(
+        const connected = yield* browser.connect({ force: true }).pipe(
           Effect.as(true),
           Effect.catchTag('BrowserClientError', Effect.fn(function* () {
             ctx.ui.notify("WebMCP: Failed to connect to Chrome. Make sure Chrome is open with remote debugging enabled.", "error");
