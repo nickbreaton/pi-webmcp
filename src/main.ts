@@ -1,4 +1,5 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import { Key, matchesKey } from "@earendil-works/pi-tui";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Layer, ManagedRuntime, Option, Schema } from "effect";
 import { memoize } from "micro-memoize";
@@ -185,6 +186,15 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   pi.on("session_shutdown", async () => {
     await runtime.dispose();
   });
+
+  if (ctx.mode === "tui") {
+    ctx.ui.onTerminalInput((data) => {
+      if (matchesKey(data, Key.escape)) {
+        ctx.ui.setWidget("webmcp-list", undefined);
+      }
+      return undefined;
+    });
+  }
 
   return { runtime };
 }, { transformKey: () => ["pi-webmcp-runtime"] });

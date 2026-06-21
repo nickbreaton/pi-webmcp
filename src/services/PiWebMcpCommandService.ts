@@ -30,7 +30,7 @@ function formatAddedOrigins(diff: WebMcpToolDiff) {
 
   return [...counts.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([origin, count]) => `${origin} (${count})`)
+    .map(([origin, count]) => `${origin} [${count}]`)
     .join(", ");
 }
 
@@ -88,6 +88,8 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
       const connect = Effect.fn("PiWebMcpCommandService.connect")(function* () {
         const ctx = yield* PiContext;
+
+        ctx.ui.setWidget("webmcp-list", undefined);
 
         const connected = yield* browser.connect({ force: true }).pipe(
           Effect.as(true),
