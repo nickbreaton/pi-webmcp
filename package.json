@@ -4,20 +4,35 @@
   "type": "module",
   "license": "MIT",
   "description": "A Pi extension that connects Pi to webpages that register WebMCP tools.",
+  "author": "Nick Breaton <nick@nickbreaton.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nickbreaton/pi-webmcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nickbreaton/pi-webmcp/issues"
+  },
+  "homepage": "https://github.com/nickbreaton/pi-webmcp#readme",
   "keywords": [
     "pi-package",
     "pi-extension",
     "webmcp"
+  ],
+  "files": [
+    ".pi/extensions/**",
+    "src/**",
+    "docs/**",
+    ".github/*.png"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "fmt": "dprint fmt",
-    "fmt:check": "dprint check"
+    "fmt:check": "dprint check",
+    "prepack": "npm run typecheck && npm test && npm run fmt:check"
   },
   "dependencies": {
-    "@effect/language-service": "^0.86.2",
     "@effect/platform-node": "4.0.0-beta.84",
     "chrome-remote-interface": "^0.33.3",
     "effect": "4.0.0-beta.84",
@@ -31,6 +46,7 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.78.1",
     "@earendil-works/pi-tui": "^0.78.1",
+    "@effect/language-service": "^0.86.2",
     "@effect/vitest": "4.0.0-beta.84",
     "@types/chrome-remote-interface": "^0.34.0",
     "@types/node": "^25.9.2",
