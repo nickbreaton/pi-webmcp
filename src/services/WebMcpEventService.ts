@@ -1,6 +1,7 @@
 import { Context, Effect, Layer, Queue, Result, Schema, Stream } from "effect";
-import { WebMcpTool } from "../schemas/WebMcpTool";
+import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
+import { PiWebMcpAllowedOriginService } from "./PiWebMcpAllowedOriginService";
 
 export const WebMcpEventToolAdded = Schema.TaggedStruct("WebMcpEventToolAdded", {
   sessionId: Schema.String,
@@ -44,10 +45,11 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
     WebMcpEventService,
     Effect.gen(function* () {
       const browser = yield* BrowserClient;
+      const allowedOrigin = yield* PiWebMcpAllowedOriginService;
 
       const setup = Effect.gen(function* () {
         const cdp = yield* browser.connect();
-        const targetBySession = new Map<string, TargetInfo>();
+      const targetBySession = new Map<string, TargetInfo>();
 
         return Stream.callback<WebMcpEvent>((queue) => {
           return Effect.gen(function* () {
@@ -67,7 +69,8 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
               if (!sessionId) return;
               const target = targetBySession.get(sessionId);
               if (!target) throw new Error(`Missing target info for WebMCP session: ${sessionId}`);
-              const origin = target.url.host
+              const origin = Schema.decodeSync(Origin)(target.url.host);
+              if (!allowedOrigin.isAllowed(origin)) return;
               for (const tool of ev.tools ?? []) {
                 const result = Schema.decodeUnknownResult(WebMcpTool)({ ...tool, origin, sessionId });
                 if (Result.isFailure(result)) continue;
@@ -152,5 +155,6 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
 
   static readonly live = WebMcpEventService.liveWithoutDependencies.pipe(
     Layer.provide(BrowserClient.live),
+    Layer.provide(PiWebMcpAllowedOriginService.live),
   );
 }
