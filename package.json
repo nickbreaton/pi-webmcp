@@ -21,8 +21,7 @@
   "files": [
     ".pi/extensions/**",
     "src/**",
-    "docs/**",
-    ".github/*.png"
+    "docs/**"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",

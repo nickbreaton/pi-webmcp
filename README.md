@@ -3,9 +3,11 @@
 A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [WebMCP](https://github.com/webmachinelearning/webmcp) tools.
 
 > [!IMPORTANT]
+>
 > Both the WebMCP specification and Chrome’s implementation are in active development. Anticipate breaking changes that affect this extension.
 
 > [!CAUTION]
+>
 > This extension can pose a security risk in its default operating mode once the `/webmcp` command is run. A malicious webpage could poison the running Pi session’s context via its WebMCP tool instructions.
 >
 > Use at your own risk. Consider setting `allowedOrigins` to restrict which webpages Pi can connect to.
@@ -20,20 +22,20 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 
 2. Enable Chrome remote debugging by visiting [`chrome://inspect/#remote-debugging`](chrome://inspect/#remote-debugging).
 
-![Chrome remote debugging settings](.github/chrome_enable_remote_debugging.png)
+![Chrome remote debugging settings](https://raw.githubusercontent.com/nickbreaton/pi-webmcp/main/.github/chrome_enable_remote_debugging.png)
 
 3. Enable the relevant Chrome flags for WebMCP.
 
    - [`chrome://flags/#devtools-webmcp-support`](chrome://flags/#devtools-webmcp-support)
    - [`chrome://flags/#enable-webmcp-testing`](chrome://flags/#enable-webmcp-testing)
 
-![Chrome WebMCP flags](.github/chrome_webmcp_flags.png)
+![Chrome WebMCP flags](https://raw.githubusercontent.com/nickbreaton/pi-webmcp/main/.github/chrome_webmcp_flags.png)
 
 ## Usage
 
 1. Run `/webmcp` and accept the once-per-session confirmation prompt in Chrome.
 
-![Chrome remote debugging permission prompt](.github/chrome_allow_remote_debugging.png)
+![Chrome remote debugging permission prompt](https://raw.githubusercontent.com/nickbreaton/pi-webmcp/main/.github/chrome_allow_remote_debugging.png)
 
 2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo.
 
