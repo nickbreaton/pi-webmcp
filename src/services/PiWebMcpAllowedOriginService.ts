@@ -7,7 +7,7 @@ export class PiWebMcpAllowedOriginService extends Context.Service<PiWebMcpAllowe
 }>()("pi-webmcp/PiWebMcpAllowedOriginService") {
   static readonly liveWithoutDependencies = Layer.effect(
     PiWebMcpAllowedOriginService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const settings = yield* PiWebMcpSettingsService;
 
       const isAllowed = (origin: Origin): boolean => {

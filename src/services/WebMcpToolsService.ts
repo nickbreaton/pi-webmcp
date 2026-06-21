@@ -7,7 +7,7 @@ export class WebMcpToolsService extends Context.Service<WebMcpToolsService, {
 }>()("pi-webmcp/WebMcpToolsService") {
   static readonly liveWithoutDependencies = Layer.effect(
     WebMcpToolsService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const events = yield* WebMcpEventService;
 
       return WebMcpToolsService.of({
@@ -33,8 +33,7 @@ export class WebMcpToolsService extends Context.Service<WebMcpToolsService, {
                 }
                 return next;
               },
-            })
-          ),
+            })),
           Stream.map((registry) => [...registry.values()]),
         ),
       });

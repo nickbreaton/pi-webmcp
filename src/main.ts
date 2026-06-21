@@ -4,8 +4,10 @@ import { NodeHttpServer } from "@effect/platform-node";
 import { Layer, ManagedRuntime, Option, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
+import { Origin, ToolId, WebMcpTools } from "./schemas/WebMcpTool";
 import { BrowserClient } from "./services/BrowserClient";
 import { PiApi, PiContext } from "./services/PiApi";
+import { PiTurnRefService } from "./services/PiTurnRefService";
 import { PiWebMcpAllowedOriginService } from "./services/PiWebMcpAllowedOriginService";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
@@ -15,11 +17,9 @@ import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
 import { PiWebMcpServeService } from "./services/PiWebMcpServeService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
-import { PiTurnRefService } from "./services/PiTurnRefService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult, renderPiWebMcpServeResult } from "./utils/renderers";
-import { Origin, ToolId, WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
@@ -60,14 +60,15 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
       args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
     }),
-    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
-      toolName: "webmcp_execute",
-      origin: Schema.decodeUnknownSync(Origin)(args.origin),
-      webMcpTool: Schema.decodeUnknownSync(ToolId)(args.tool),
-    }),
+    renderCall: (args, theme) =>
+      renderPiWebMcpCall(theme, {
+        toolName: "webmcp_execute",
+        origin: Schema.decodeUnknownSync(Origin)(args.origin),
+        webMcpTool: Schema.decodeUnknownSync(ToolId)(args.tool),
+      }),
     renderResult: renderPiWebMcpResult,
     async execute(_toolCallId, params) {
-      return runtime.runPromise(PiWebMcpExecuteService.use(service => service.execute(params)));
+      return runtime.runPromise(PiWebMcpExecuteService.use((service) => service.execute(params)));
     },
   });
 
@@ -85,12 +86,13 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       refresh: Type.Optional(Type.Boolean({ description: "Reserved; the session does not actively scan the browser on call." })),
       origin: Type.Optional(Type.String({ description: "Optional origin/host to limit results to tools from a single WebMCP page (e.g. example.com)." })),
     }),
-    renderCall: (_, theme) => renderPiWebMcpCall(theme, {
-      toolName: "webmcp_list",
-    }),
+    renderCall: (_, theme) =>
+      renderPiWebMcpCall(theme, {
+        toolName: "webmcp_list",
+      }),
     renderResult: renderPiWebMcpMarkdownResult,
     async execute(_, params) {
-      return runtime.runPromise(PiWebMcpListService.use(service => service.execute(params)));
+      return runtime.runPromise(PiWebMcpListService.use((service) => service.execute(params)));
     },
   });
 
@@ -106,14 +108,15 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       tool: Type.String({ description: "Tool id from webmcp_list, or the page-provided tool name." }),
       origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
     }),
-    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
-      toolName: "webmcp_describe",
-      origin: Schema.decodeUnknownSync(Origin)(args.origin),
-      webMcpTool: Schema.decodeUnknownSync(ToolId)(args.tool),
-    }),
+    renderCall: (args, theme) =>
+      renderPiWebMcpCall(theme, {
+        toolName: "webmcp_describe",
+        origin: Schema.decodeUnknownSync(Origin)(args.origin),
+        webMcpTool: Schema.decodeUnknownSync(ToolId)(args.tool),
+      }),
     renderResult: renderPiWebMcpResult,
     async execute(_, params) {
-      return runtime.runPromise(PiWebMcpDescribeService.use(service => service.execute(params)));
+      return runtime.runPromise(PiWebMcpDescribeService.use((service) => service.execute(params)));
     },
   });
 
@@ -130,24 +133,25 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     parameters: Type.Object({
       path: Type.String({ description: "File or directory path to serve. Relative paths resolve from the current Pi working directory." }),
     }),
-    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
-      toolName: "webmcp_serve",
-      target: args.path,
-    }),
+    renderCall: (args, theme) =>
+      renderPiWebMcpCall(theme, {
+        toolName: "webmcp_serve",
+        target: args.path,
+      }),
     renderResult: renderPiWebMcpServeResult,
     async execute(_, params) {
-      return runtime.runPromise(PiWebMcpServeService.use(service => service.execute(params)));
+      return runtime.runPromise(PiWebMcpServeService.use((service) => service.execute(params)));
     },
   });
 
-  pi.on('turn_end', async () => {
-    await runtime.runPromise(PiTurnRefService.use(service => service.reset()))
+  pi.on("turn_end", async () => {
+    await runtime.runPromise(PiTurnRefService.use((service) => service.reset()));
   });
 
-  pi.on('before_agent_start', async (event, ctx) => {
+  pi.on("before_agent_start", async (event, ctx) => {
     ctx.ui.setWidget("webmcp-list", undefined);
 
-    const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use(service => service.getSystemPrompt()));
+    const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use((service) => service.getSystemPrompt()));
 
     if (!prompt) return;
 
@@ -159,10 +163,10 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   pi.on("message_end", async (event) => {
     if (event.message.role !== "user") return;
 
-    const tools = await runtime.runPromise(PiWebMcpToolStateService.use(service => service.commit));
+    const tools = await runtime.runPromise(PiWebMcpToolStateService.use((service) => service.commit));
     if (Option.isNone(tools)) return;
 
-    const messageWithDetails = event.message as typeof event.message & { details?: Record<string, unknown> };
+    const messageWithDetails = event.message as typeof event.message & { details?: Record<string, unknown>; };
 
     return {
       message: {
@@ -175,12 +179,12 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     };
   });
 
-  pi.on('agent_end', async () => {
-    await runtime.runPromise(PiWebMcpCommandService.use(service => service.nudge()));
+  pi.on("agent_end", async () => {
+    await runtime.runPromise(PiWebMcpCommandService.use((service) => service.nudge()));
   });
 
-  pi.on('session_tree', async () => {
-    await runtime.runPromise(PiWebMcpCommandService.use(service => service.nudge()));
+  pi.on("session_tree", async () => {
+    await runtime.runPromise(PiWebMcpCommandService.use((service) => service.nudge()));
   });
 
   pi.on("session_shutdown", async () => {
@@ -202,7 +206,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
 export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext) {
   const { runtime } = init(pi, ctx);
 
-  const effect = PiWebMcpCommandService.use(service => {
+  const effect = PiWebMcpCommandService.use((service) => {
     return service.handle(args);
   });
 

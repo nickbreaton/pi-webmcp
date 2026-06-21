@@ -1,4 +1,4 @@
-import { getMarkdownTheme, keyText, type AgentToolResult, type Theme, type ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
+import { type AgentToolResult, getMarkdownTheme, keyText, type Theme, type ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { Markdown, Text } from "@earendil-works/pi-tui";
 import type { Origin, ToolId } from "../schemas/WebMcpTool";
 
@@ -38,7 +38,7 @@ export const renderPiWebMcpCall = (
 };
 
 const getTextResult = (result: AgentToolResult<unknown>): string => {
-  return result.content?.find(c => c.type === "text")?.text ?? "";
+  return result.content?.find((c) => c.type === "text")?.text ?? "";
 };
 
 export const renderPiWebMcpResult = (
@@ -65,6 +65,6 @@ export const renderPiWebMcpServeResult = (
   return new Text(`\n${getTextResult(result)}`, 0, 0);
 };
 
-export const renderPiWebMcpListMessage = (message: { readonly content: unknown }) => {
+export const renderPiWebMcpListMessage = (message: { readonly content: unknown; }) => {
   return new Markdown(typeof message.content === "string" ? message.content : "", 0, 0, getMarkdownTheme());
 };

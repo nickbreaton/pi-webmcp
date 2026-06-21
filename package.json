@@ -10,7 +10,9 @@
     "webmcp"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "fmt": "dprint fmt",
+    "fmt:check": "dprint check"
   },
   "dependencies": {
     "@effect/language-service": "^0.86.2",
@@ -29,6 +31,7 @@
     "@earendil-works/pi-tui": "^0.78.1",
     "@types/chrome-remote-interface": "^0.34.0",
     "@types/node": "^25.9.2",
+    "dprint": "^0.54.0",
     "typebox": "^1.2.1",
     "typescript": "^6.0.3"
   },

@@ -1,4 +1,4 @@
-import { highlightCode, type AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { type AgentToolResult, highlightCode } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Formatter, Layer, Option, Schema } from "effect";
 import { Origin, ToolId, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
@@ -21,7 +21,7 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
 }>()("pi-webmcp/PiWebMcpDescribeService") {
   static readonly live = Layer.effect(
     PiWebMcpDescribeService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const browser = yield* BrowserClient;
       const toolState = yield* PiWebMcpToolStateService;
 
@@ -50,44 +50,43 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
       // Needs investigation into whether this and PiWebMcpExecuteService's
       // resolveTool should share one service.
       const resolveTool = (tools: WebMcpTool[], id: ToolId, origin: Origin) => {
-        const candidates = tools.filter((tool) =>
-          (tool.id === id || tool.name === id) && tool.origin === origin,
-        );
+        const candidates = tools.filter((tool) => (tool.id === id || tool.name === id) && tool.origin === origin);
 
         return candidates.length === 1 ? candidates[0] : { candidates };
       };
 
       return PiWebMcpDescribeService.of({
-        execute: (params) => Effect.gen(function* () {
-          const cdpOption = yield* browser.get;
-          if (Option.isNone(cdpOption)) {
-            return {
-              content: [{ type: "text", text: "WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools." }],
-              details: {},
-            };
-          }
+        execute: (params) =>
+          Effect.gen(function*() {
+            const cdpOption = yield* browser.get;
+            if (Option.isNone(cdpOption)) {
+              return {
+                content: [{ type: "text", text: "WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools." }],
+                details: {},
+              };
+            }
 
-          const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
-          const origin = Schema.decodeUnknownSync(Origin)(params.origin);
-          const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
-          const resolved = resolveTool(activeTools, toolId, origin);
-          if ("candidates" in resolved) {
-            return {
-              content: [{
-                type: "text",
-                text: resolved.candidates.length > 0
-                  ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}`
-                  : `Tool not found: ${params.tool}. Try webmcp_list first.`,
-              }],
-              details: {},
-            };
-          }
+            const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
+            const origin = Schema.decodeUnknownSync(Origin)(params.origin);
+            const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
+            const resolved = resolveTool(activeTools, toolId, origin);
+            if ("candidates" in resolved) {
+              return {
+                content: [{
+                  type: "text",
+                  text: resolved.candidates.length > 0
+                    ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}`
+                    : `Tool not found: ${params.tool}. Try webmcp_list first.`,
+                }],
+                details: {},
+              };
+            }
 
-          const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
-          const highlightedInputSchema = highlightCode(inputSchema, "json").join("\n");
-          const text = `\n${resolved.description ?? "(no description)"}\n\n${highlightedInputSchema}`;
-          return { content: [{ type: "text", text }], details: {} };
-        }),
+            const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
+            const highlightedInputSchema = highlightCode(inputSchema, "json").join("\n");
+            const text = `\n${resolved.description ?? "(no description)"}\n\n${highlightedInputSchema}`;
+            return { content: [{ type: "text", text }], details: {} };
+          }),
       });
     }),
   );

@@ -1,4 +1,4 @@
-import { highlightCode, type AgentToolResult } from "@earendil-works/pi-coding-agent";
+import { type AgentToolResult, highlightCode } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Origin, ToolId, WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient, type CdpClient } from "./BrowserClient";
@@ -23,7 +23,7 @@ export type PiWebMcpExecuteDetails = {
 export class PiWebMcpExecuteError extends Schema.TaggedErrorClass<PiWebMcpExecuteError>()("PiWebMcpExecuteError", {
   operation: Schema.Union([Schema.Literal("parseInput"), Schema.Literal("invokeTool")]),
   cause: Schema.Unknown,
-}) { }
+}) {}
 
 function listToolsText(tools: WebMcpTool[]) {
   if (tools.length === 0) return "No WebMCP tools found. Ask the user to run `/webmcp` first.";
@@ -40,9 +40,7 @@ function listToolsText(tools: WebMcpTool[]) {
 }
 
 function resolveTool(tools: WebMcpTool[], id: ToolId, origin?: Origin) {
-  const candidates = tools.filter((tool) =>
-    (tool.id === id || tool.name === id) && (!origin || tool.origin === origin),
-  );
+  const candidates = tools.filter((tool) => (tool.id === id || tool.name === id) && (!origin || tool.origin === origin));
 
   return candidates.length === 1 ? candidates[0] : { candidates };
 }
@@ -69,9 +67,11 @@ function invokeWebMcpTool(cdp: CdpClient, tool: WebMcpTool, input: Record<string
       let invocationId: string | undefined;
       const responsePromise = new Promise<unknown>((resolve, reject) => {
         const timer = setTimeout(() => {
-          reject(new Error(
-            "Timed out waiting for WebMCP.toolResponded. The page accepted the invocation but did not respond; declarative form tools may require the page/form to opt into toolautosubmit or otherwise call event.respondWith(...).",
-          ));
+          reject(
+            new Error(
+              "Timed out waiting for WebMCP.toolResponded. The page accepted the invocation but did not respond; declarative form tools may require the page/form to opt into toolautosubmit or otherwise call event.respondWith(...).",
+            ),
+          );
         }, 60_000);
 
         cdp.on("WebMCP.toolResponded", (ev: any, evSessionId?: string) => {
@@ -106,43 +106,44 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
 }>()("pi-webmcp/PiWebMcpExecuteService") {
   static readonly live = Layer.effect(
     PiWebMcpExecuteService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const browser = yield* BrowserClient;
       const toolState = yield* PiWebMcpToolStateService;
 
       return PiWebMcpExecuteService.of({
-        execute: (params) => Effect.gen(function* () {
-          const cdpOption = yield* browser.get;
-          if (Option.isNone(cdpOption)) {
-            return textResult("WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools.", { connected: false });
-          }
+        execute: (params) =>
+          Effect.gen(function*() {
+            const cdpOption = yield* browser.get;
+            if (Option.isNone(cdpOption)) {
+              return textResult("WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools.", { connected: false });
+            }
 
-          const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
-          const origin = Schema.decodeUnknownSync(Origin)(params.origin);
-          const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
-          const resolved = resolveTool(activeTools, toolId, origin);
-          if ("candidates" in resolved) {
-            return textResult(
-              resolved.candidates.length > 0
-                ? `Ambiguous tool. Retry with origin.\n\n${listToolsText(resolved.candidates)}`
-                : `Tool not found: ${params.tool}. Try /webmcp first.`,
-              { error: "tool_not_found_or_ambiguous" },
-            );
-          }
+            const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
+            const origin = Schema.decodeUnknownSync(Origin)(params.origin);
+            const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
+            const resolved = resolveTool(activeTools, toolId, origin);
+            if ("candidates" in resolved) {
+              return textResult(
+                resolved.candidates.length > 0
+                  ? `Ambiguous tool. Retry with origin.\n\n${listToolsText(resolved.candidates)}`
+                  : `Tool not found: ${params.tool}. Try /webmcp first.`,
+                { error: "tool_not_found_or_ambiguous" },
+              );
+            }
 
-          const input = yield* parseInput(params.args);
-          const result = yield* invokeWebMcpTool(cdpOption.value, resolved, input);
-          const inputJson = highlightCode(JSON.stringify(input, null, 2), "json").join("\n");
-          const responseJson = highlightCode(JSON.stringify((result as any).response, null, 2), "json").join("\n");
-          const text = `\n→\n\n${inputJson}\n\n←\n\n${responseJson}`;
+            const input = yield* parseInput(params.args);
+            const result = yield* invokeWebMcpTool(cdpOption.value, resolved, input);
+            const inputJson = highlightCode(JSON.stringify(input, null, 2), "json").join("\n");
+            const responseJson = highlightCode(JSON.stringify((result as any).response, null, 2), "json").join("\n");
+            const text = `\n→\n\n${inputJson}\n\n←\n\n${responseJson}`;
 
-          return textResult(text, {
-            id: resolved.id,
-            origin: resolved.origin,
-            input,
-            result,
-          });
-        }).pipe(Effect.catch((cause: unknown) => Effect.succeed(textResult(String(cause instanceof Error ? cause.message : cause), { error: "execute_failed" })))),
+            return textResult(text, {
+              id: resolved.id,
+              origin: resolved.origin,
+              input,
+              result,
+            });
+          }).pipe(Effect.catch((cause: unknown) => Effect.succeed(textResult(String(cause instanceof Error ? cause.message : cause), { error: "execute_failed" })))),
       });
     }),
   );

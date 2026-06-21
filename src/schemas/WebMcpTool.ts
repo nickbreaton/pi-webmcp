@@ -4,16 +4,16 @@ export class WebMcpToolAnnotation extends Schema.Class<WebMcpToolAnnotation>("We
   readOnly: Schema.optionalKey(Schema.Boolean),
   untrustedContent: Schema.optionalKey(Schema.Boolean),
   autosubmit: Schema.optionalKey(Schema.Boolean),
-}) { }
+}) {}
 
 export class WebMcpToolMetadata extends Schema.Class<WebMcpToolMetadata>("WebMcpToolMetadata")({
   targetId: Schema.String,
   title: Schema.String,
   url: Schema.String,
-}) { }
+}) {}
 
 export const Origin = Schema.String.pipe(Schema.brand("Origin"));
-export type Origin = typeof Origin.Type
+export type Origin = typeof Origin.Type;
 
 export const ToolId = Schema.String.pipe(Schema.brand("ToolId"));
 export type ToolId = typeof ToolId.Type;
@@ -53,7 +53,7 @@ export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
 export class WebMcpToolContainer extends Schema.Class<WebMcpToolContainer>("WebMcpToolContainer")({
   metadata: WebMcpToolMetadata,
   tool: WebMcpTool,
-}) { }
+}) {}
 
 export const WebMcpTools = Schema.Array(WebMcpTool);
 export const WebMcpToolContainers = Schema.Array(WebMcpToolContainer);

@@ -20,20 +20,20 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 
 2. Enable Chrome remote debugging by visiting [`chrome://inspect/#remote-debugging`](chrome://inspect/#remote-debugging).
 
-  ![Chrome remote debugging settings](.github/chrome_enable_remote_debugging.png)
+![Chrome remote debugging settings](.github/chrome_enable_remote_debugging.png)
 
 3. Enable the relevant Chrome flags for WebMCP.
 
    - [`chrome://flags/#devtools-webmcp-support`](chrome://flags/#devtools-webmcp-support)
    - [`chrome://flags/#enable-webmcp-testing`](chrome://flags/#enable-webmcp-testing)
 
-  ![Chrome WebMCP flags](.github/chrome_webmcp_flags.png)
+![Chrome WebMCP flags](.github/chrome_webmcp_flags.png)
 
 ## Usage
 
 1. Run `/webmcp` and accept the once-per-session confirmation prompt in Chrome.
 
-  ![Chrome remote debugging permission prompt](.github/chrome_allow_remote_debugging.png)
+![Chrome remote debugging permission prompt](.github/chrome_allow_remote_debugging.png)
 
 2. Navigate to a WebMCP-capable page, such as Chrome Lab’s [WebMCP Travel](https://googlechromelabs.github.io/webmcp-tools/demos/react-flightsearch/) demo.
 
@@ -52,15 +52,15 @@ Configure WebMCP options under the `webmcp` key in Pi settings, either globally 
 ```json
 {
   "webmcp": {
-    "allowedOrigins": ["googlechromelabs.github.io"],
+    "allowedOrigins": ["googlechromelabs.github.io"]
   }
 }
 ```
 
-| Option | Description |
-|--------|-------------|
-| `webmcp.allowedOrigins` | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
-| `webmcp.disallowedOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
+| Option                     | Description                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `webmcp.allowedOrigins`    | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
+| `webmcp.disallowedOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins.   |
 
 ## Browser Support
 

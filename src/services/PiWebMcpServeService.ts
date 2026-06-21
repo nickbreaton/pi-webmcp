@@ -40,7 +40,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
 }>()("pi-webmcp/PiWebMcpServeService") {
   static readonly live = Layer.effect(
     PiWebMcpServeService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const scope = yield* Scope.Scope;
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -49,7 +49,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
       const toolState = yield* PiWebMcpToolStateService;
       const mountsRef = yield* Ref.make<Mount[]>([]);
 
-      const app = Effect.gen(function* () {
+      const app = Effect.gen(function*() {
         const request = yield* HttpServerRequest.HttpServerRequest;
         const stagedTools = yield* toolState.staged;
         const committedTools = yield* toolState.committed;
@@ -96,7 +96,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
         return withCorsOrigins(request, response, allowedOrigins);
       });
 
-      const startServer = yield* Effect.cached(Effect.gen(function* () {
+      const startServer = yield* Effect.cached(Effect.gen(function*() {
         const serverContext = yield* Layer.buildWithScope(NodeHttpServer.layerTest, scope);
         const server = Context.get(serverContext, HttpServer.HttpServer);
 
@@ -116,52 +116,57 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
       }));
 
       return PiWebMcpServeService.of({
-        execute: (params) => Effect.gen(function* () {
-          const ctx = yield* PiContext;
-          const server = yield* startServer;
-          const resolvedPath = path.isAbsolute(params.path)
-            ? params.path
-            : path.resolve(ctx.cwd, params.path);
-          const stat = yield* fileSystem.stat(resolvedPath);
+        execute: (params) =>
+          Effect.gen(function*() {
+            const ctx = yield* PiContext;
+            const server = yield* startServer;
+            const resolvedPath = path.isAbsolute(params.path)
+              ? params.path
+              : path.resolve(ctx.cwd, params.path);
+            const stat = yield* fileSystem.stat(resolvedPath);
 
-          if (stat.type !== "File" && stat.type !== "Directory") {
+            if (stat.type !== "File" && stat.type !== "Directory") {
+              return {
+                content: [{ type: "text" as const, text: `Cannot serve ${resolvedPath}: path is not a file or directory.` }],
+                details: {},
+              };
+            }
+
+            const mount: Mount = stat.type === "File"
+              ? {
+                root: path.dirname(resolvedPath),
+                kind: "file",
+                fileName: path.basename(resolvedPath),
+              }
+              : {
+                root: resolvedPath,
+                kind: "directory",
+              };
+
+            const id = yield* Ref.modify(mountsRef, (mounts) => {
+              const next = [...mounts, mount];
+              return [String(next.length - 1), next] as const;
+            });
+
             return {
-              content: [{ type: "text" as const, text: `Cannot serve ${resolvedPath}: path is not a file or directory.` }],
+              content: [{
+                type: "text" as const,
+                text: `Serving ${mount.kind} at ${
+                  mount.kind === "file"
+                    ? `${server.origin}/${id}/${encodeURIComponent(mount.fileName!)}`
+                    : `${server.origin}/${id}/`
+                }`,
+              }],
               details: {},
             };
-          }
-
-          const mount: Mount = stat.type === "File"
-            ? {
-              root: path.dirname(resolvedPath),
-              kind: "file",
-              fileName: path.basename(resolvedPath),
-            }
-            : {
-              root: resolvedPath,
-              kind: "directory",
-            };
-
-          const id = yield* Ref.modify(mountsRef, (mounts) => {
-            const next = [...mounts, mount];
-            return [String(next.length - 1), next] as const;
-          });
-
-          return {
-            content: [{
-              type: "text" as const,
-              text: `Serving ${mount.kind} at ${mount.kind === "file"
-                ? `${server.origin}/${id}/${encodeURIComponent(mount.fileName!)}`
-                : `${server.origin}/${id}/`}`,
-            }],
-            details: {},
-          };
-        }).pipe(
-          Effect.catch((cause: unknown) => Effect.succeed({
-            content: [{ type: "text" as const, text: `Failed to serve path: ${cause instanceof Error ? cause.message : String(cause)}` }],
-            details: {},
-          })),
-        ),
+          }).pipe(
+            Effect.catch((cause: unknown) =>
+              Effect.succeed({
+                content: [{ type: "text" as const, text: `Failed to serve path: ${cause instanceof Error ? cause.message : String(cause)}` }],
+                details: {},
+              })
+            ),
+          ),
       });
     }),
   );

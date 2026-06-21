@@ -19,23 +19,23 @@ const DEFAULT_WS = process.env.CDP_WS ?? `ws://${DEFAULT_HOST}:${DEFAULT_PORT}/d
 export class BrowserClientError extends Schema.TaggedErrorClass<BrowserClientError>()("BrowserClientError", {
   operation: Schema.Union([Schema.Literal("connect"), Schema.Literal("disconnect")]),
   cause: Schema.Unknown,
-}) { }
+}) {}
 
 export class BrowserClient extends Context.Service<BrowserClient, {
-  readonly connect: (options?: { readonly force?: boolean }) => Effect.Effect<CdpClient, BrowserClientError>;
+  readonly connect: (options?: { readonly force?: boolean; }) => Effect.Effect<CdpClient, BrowserClientError>;
   readonly get: Effect.Effect<Option.Option<CdpClient>>;
   readonly disconnect: () => Effect.Effect<void, BrowserClientError>;
 }>()("pi-webmcp/BrowserClient") {
   static readonly live = Layer.effect(
     BrowserClient,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const clientRef = yield* Ref.make<Option.Option<CdpClient>>(Option.none());
       const scope = yield* Effect.scope;
       const context = yield* Effect.context();
 
       const clear = Ref.set(clientRef, Option.none());
 
-      const connect = Effect.fn("BrowserClient.connect")(function* (options?: { readonly force?: boolean }) {
+      const connect = Effect.fn("BrowserClient.connect")(function*(options?: { readonly force?: boolean; }) {
         const existing = yield* Ref.get(clientRef);
 
         if (Option.isSome(existing)) {
@@ -53,15 +53,16 @@ export class BrowserClient extends Context.Service<BrowserClient, {
             try: () => CDP({ target: DEFAULT_WS, local: true }),
             catch: (cause) => new BrowserClientError({ operation: "connect", cause }),
           }),
-          (client) => Effect.gen(function* () {
-            const existing = yield* Ref.get(clientRef);
-            if (Option.isNone(existing) || existing.value !== client) return;
-            yield* Ref.set(clientRef, Option.none());
-            yield* Effect.tryPromise({
-              try: () => client.close(),
-              catch: (cause) => new BrowserClientError({ operation: "disconnect", cause }),
-            }).pipe(Effect.ignore);
-          }),
+          (client) =>
+            Effect.gen(function*() {
+              const existing = yield* Ref.get(clientRef);
+              if (Option.isNone(existing) || existing.value !== client) return;
+              yield* Ref.set(clientRef, Option.none());
+              yield* Effect.tryPromise({
+                try: () => client.close(),
+                catch: (cause) => new BrowserClientError({ operation: "disconnect", cause }),
+              }).pipe(Effect.ignore);
+            }),
         ).pipe(Scope.provide(scope));
 
         client.on("disconnect", () => Effect.runSyncWith(context)(clear));
@@ -69,7 +70,7 @@ export class BrowserClient extends Context.Service<BrowserClient, {
         return client;
       });
 
-      const disconnect = Effect.fn("BrowserClient.disconnect")(function* () {
+      const disconnect = Effect.fn("BrowserClient.disconnect")(function*() {
         const existing = yield* Ref.get(clientRef);
         if (Option.isNone(existing)) return;
         yield* Ref.set(clientRef, Option.none());

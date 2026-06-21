@@ -1,0 +1,15 @@
+{
+  "lsp": {
+    "dprint": {
+      "binary": {
+        "path": "node_modules/.bin/dprint",
+        "arguments": ["lsp"]
+      }
+    }
+  },
+  "formatter": {
+    "language_server": {
+      "name": "dprint"
+    }
+  }
+}

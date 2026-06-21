@@ -5,7 +5,7 @@ import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 import { WebMcpToolDiffService } from "./WebMcpToolDiffService";
 
-function formatTools(tools: WebMcpTool[], options: { readonly includeDescription: boolean; readonly unavailableOriginLabel?: string }) {
+function formatTools(tools: WebMcpTool[], options: { readonly includeDescription: boolean; readonly unavailableOriginLabel?: string; }) {
   if (tools.length === 0) return "none";
 
   const groups: WebMcpTool[][] = [];
@@ -38,13 +38,13 @@ export class PiWebMcpSystemPromptService extends Context.Service<PiWebMcpSystemP
 }>()("pi-webmcp/PiWebMcpSystemPromptService") {
   static readonly live = Layer.effect(
     PiWebMcpSystemPromptService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const browser = yield* BrowserClient;
       const toolState = yield* PiWebMcpToolStateService;
       const toolDiff = yield* WebMcpToolDiffService;
 
       return PiWebMcpSystemPromptService.of({
-        getSystemPrompt: Effect.fn(function* () {
+        getSystemPrompt: Effect.fn(function*() {
           const cdp = yield* browser.get;
 
           if (Option.isNone(cdp)) {
@@ -57,7 +57,9 @@ export class PiWebMcpSystemPromptService extends Context.Service<PiWebMcpSystemP
 
           if (!toolDiff.hasDiff(diff)) return undefined;
 
-          return `WebMCP connection is live.\n\nNew tools available:\n\n${formatTools(diff.added, { includeDescription: true })}\n\nTools no longer available:\n\n${formatTools(diff.removed, { includeDescription: false, unavailableOriginLabel: "none remain" })}\n\nKeep a running internal ledger of the WebMCP tool changes listed above and prefer it over calling webmcp_list. Only call webmcp_list when you are genuinely confused about which tools are available or need the full grouped listing; it does not actively scan the browser.`;
+          return `WebMCP connection is live.\n\nNew tools available:\n\n${formatTools(diff.added, { includeDescription: true })}\n\nTools no longer available:\n\n${
+            formatTools(diff.removed, { includeDescription: false, unavailableOriginLabel: "none remain" })
+          }\n\nKeep a running internal ledger of the WebMCP tool changes listed above and prefer it over calling webmcp_list. Only call webmcp_list when you are genuinely confused about which tools are available or need the full grouped listing; it does not actively scan the browser.`;
         }),
       });
     }),

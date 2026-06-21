@@ -31,7 +31,7 @@ class TargetInfo extends Schema.Class<TargetInfo>("TargetInfo")({
   url: Schema.URLFromString,
   type: Schema.String,
   attached: Schema.optionalKey(Schema.Boolean),
-}) { }
+}) {}
 
 function isPageTarget(target: TargetInfo) {
   return target.type === "page" && target.url.protocol !== "chrome:" && target.url.protocol !== "devtools:";
@@ -42,15 +42,15 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
 }>()("pi-webmcp/WebMcpEventService") {
   static readonly liveWithoutDependencies = Layer.effect(
     WebMcpEventService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const browser = yield* BrowserClient;
 
-      const setup = Effect.gen(function* () {
+      const setup = Effect.gen(function*() {
         const cdp = yield* browser.connect();
         const targetBySession = new Map<string, TargetInfo>();
 
         return Stream.callback<WebMcpEvent>((queue) => {
-          return Effect.gen(function* () {
+          return Effect.gen(function*() {
             const attachTarget = async (target: TargetInfo) => {
               if (!isPageTarget(target) || target.attached) return;
               try {
@@ -88,23 +88,23 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
             const onFrameNavigated = (ev: any, sessionId?: string) => {
               if (!sessionId || ev.frame?.parentId) return;
               Queue.offerUnsafe(queue, WebMcpEventSessionCleared.make({ sessionId }));
-              cdp.send("WebMCP.enable", {}, sessionId).catch(() => { });
+              cdp.send("WebMCP.enable", {}, sessionId).catch(() => {});
             };
 
-            const onDetachedFromTarget = ({ sessionId }: { sessionId?: string }) => {
+            const onDetachedFromTarget = ({ sessionId }: { sessionId?: string; }) => {
               if (!sessionId) return;
               targetBySession.delete(sessionId);
               Queue.offerUnsafe(queue, WebMcpEventSessionCleared.make({ sessionId }));
             };
 
-            const onTargetCreated = ({ targetInfo }: { targetInfo?: unknown }) => {
+            const onTargetCreated = ({ targetInfo }: { targetInfo?: unknown; }) => {
               if (!targetInfo) return;
               const result = Schema.decodeUnknownResult(TargetInfo)(targetInfo);
               if (Result.isFailure(result)) return;
               void attachTarget(result.success);
             };
 
-            const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: unknown }) => {
+            const onTargetInfoChanged = ({ targetInfo }: { targetInfo?: unknown; }) => {
               if (!targetInfo) return;
               const result = Schema.decodeUnknownResult(TargetInfo)(targetInfo);
               if (Result.isFailure(result)) return;
@@ -112,7 +112,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
             };
 
             yield* Effect.acquireRelease(
-              Effect.gen(function* () {
+              Effect.gen(function*() {
                 yield* Effect.sync(() => cdp.on("WebMCP.toolsAdded", onToolsAdded));
                 yield* Effect.sync(() => cdp.on("WebMCP.toolsRemoved", onToolsRemoved));
                 yield* Effect.sync(() => cdp.on("Page.frameNavigated", onFrameNavigated));
@@ -131,14 +131,15 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
                   yield* Effect.tryPromise(() => attachTarget(target)).pipe(Effect.ignore);
                 }
               }).pipe(Effect.ignore),
-              () => Effect.sync(() => {
-                cdp.off!("WebMCP.toolsAdded", onToolsAdded);
-                cdp.off!("WebMCP.toolsRemoved", onToolsRemoved);
-                cdp.off!("Page.frameNavigated", onFrameNavigated);
-                cdp.off!("Target.detachedFromTarget", onDetachedFromTarget);
-                cdp.off!("Target.targetCreated", onTargetCreated);
-                cdp.off!("Target.targetInfoChanged", onTargetInfoChanged);
-              })
+              () =>
+                Effect.sync(() => {
+                  cdp.off!("WebMCP.toolsAdded", onToolsAdded);
+                  cdp.off!("WebMCP.toolsRemoved", onToolsRemoved);
+                  cdp.off!("Page.frameNavigated", onFrameNavigated);
+                  cdp.off!("Target.detachedFromTarget", onDetachedFromTarget);
+                  cdp.off!("Target.targetCreated", onTargetCreated);
+                  cdp.off!("Target.targetInfoChanged", onTargetInfoChanged);
+                }),
             );
           }).pipe(Effect.ignore);
         });

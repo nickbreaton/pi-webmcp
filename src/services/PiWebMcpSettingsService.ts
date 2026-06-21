@@ -6,11 +6,11 @@ import { PiContext } from "./PiApi";
 export class PiWebMcpSettings extends Schema.Class<PiWebMcpSettings>("pi-webmcp/PiWebMcpSettings")({
   allowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
   disallowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
-}) { }
+}) {}
 
 class PiSettings extends Schema.Class<PiSettings>("pi-webmcp/PiSettings")({
   webmcp: Schema.optionalKey(PiWebMcpSettings),
-}) { }
+}) {}
 
 export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsService, {
   readonly allowedOrigins: Option.Option<ReadonlySet<Origin>>;
@@ -18,7 +18,7 @@ export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsSer
 }>()("pi-webmcp/PiWebMcpSettingsService") {
   static readonly live = Layer.effect(
     PiWebMcpSettingsService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const ctx = yield* PiContext;
       const manager = SettingsManager.create(ctx.cwd, getAgentDir());
 

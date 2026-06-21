@@ -3,10 +3,10 @@ import { Container, Markdown, Spacer } from "@earendil-works/pi-tui";
 import { Context, Effect, Layer, Option, Ref, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
+import { PiTurnRefService } from "./PiTurnRefService";
 import { PiWebMcpAllowedOriginService } from "./PiWebMcpAllowedOriginService";
 import { PiWebMcpListService } from "./PiWebMcpListService";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
-import { PiTurnRefService } from "./PiTurnRefService";
 import { WebMcpToolDiff, WebMcpToolDiffService } from "./WebMcpToolDiffService";
 import { WebMcpToolsService } from "./WebMcpToolsService";
 
@@ -40,7 +40,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 }>()("pi-webmcp/PiWebMcpCommandService") {
   static readonly liveWithoutDependencies = Layer.effect(
     PiWebMcpCommandService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const browser = yield* BrowserClient;
       const toolState = yield* PiWebMcpToolStateService;
       const listService = yield* PiWebMcpListService;
@@ -48,10 +48,10 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const allowedOrigin = yield* PiWebMcpAllowedOriginService;
       const toolDiff = yield* WebMcpToolDiffService;
       const turnRefService = yield* PiTurnRefService;
-      const notificationShownRef = yield* turnRefService.make(Option.some(true))
+      const notificationShownRef = yield* turnRefService.make(Option.some(true));
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
-      const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function* () {
+      const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function*() {
         const ctx = yield* PiContext;
 
         ctx.ui.setWidget("webmcp-list", undefined);
@@ -60,7 +60,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
         yield* toolState.stage([]);
       });
 
-      const list = Effect.fn("PiWebMcpCommandService.list")(function* () {
+      const list = Effect.fn("PiWebMcpCommandService.list")(function*() {
         const ctx = yield* PiContext;
         const cdp = yield* browser.get;
 
@@ -86,18 +86,21 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
         });
       });
 
-      const connect = Effect.fn("PiWebMcpCommandService.connect")(function* () {
+      const connect = Effect.fn("PiWebMcpCommandService.connect")(function*() {
         const ctx = yield* PiContext;
 
         ctx.ui.setWidget("webmcp-list", undefined);
 
         const connected = yield* browser.connect({ force: true }).pipe(
           Effect.as(true),
-          Effect.catchTag('BrowserClientError', Effect.fn(function* () {
-            ctx.ui.notify("WebMCP: Failed to connect to Chrome. Make sure Chrome is open with remote debugging enabled.", "error");
-            return false;
-          }))
-        )
+          Effect.catchTag(
+            "BrowserClientError",
+            Effect.fn(function*() {
+              ctx.ui.notify("WebMCP: Failed to connect to Chrome. Make sure Chrome is open with remote debugging enabled.", "error");
+              return false;
+            }),
+          ),
+        );
 
         if (!connected) return;
 
@@ -105,62 +108,65 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
           Stream.map((tools) => tools.filter((tool) => allowedOrigin.isAllowed(tool.origin))),
           Stream.zipLatestWith(SubscriptionRef.changes(nudges), (tools) => tools),
           // Stage every change immediately so the registry stays current.
-          Stream.tap(active => toolState.stage(active)),
+          Stream.tap((active) => toolState.stage(active)),
           // Only notify for the latest change once the agent is idle. If a
           // newer change arrives while we're waiting, `switchMap` interrupts
           // the pending notification and restarts with the latest state,
           // preventing a backlog of queued notifications.
-          Stream.switchMap(active => Stream.fromEffectDrain(Effect.gen(function* () {
-            yield* Effect.promise(() => ctx.waitForIdle());
+          Stream.switchMap((active) =>
+            Stream.fromEffectDrain(Effect.gen(function*() {
+              yield* Effect.promise(() => ctx.waitForIdle());
 
-            const committed = yield* toolState.committed;
-            const diff = toolDiff.diff(committed, active);
+              const committed = yield* toolState.committed;
+              const diff = toolDiff.diff(committed, active);
 
-            const notificationShown = yield* Ref.get(notificationShownRef).pipe(
-              Effect.map(Option.getOrElse(() => false))
-            )
+              const notificationShown = yield* Ref.get(notificationShownRef).pipe(
+                Effect.map(Option.getOrElse(() => false)),
+              );
 
-            if (!toolDiff.hasDiff(diff) && notificationShown) {
-              ctx.ui.notify("");
-              return;
-            }
+              if (!toolDiff.hasDiff(diff) && notificationShown) {
+                ctx.ui.notify("");
+                return;
+              }
 
-            if (diff.added.length === 0) {
-              return;
-            }
+              if (diff.added.length === 0) {
+                return;
+              }
 
-            yield* Ref.set(notificationShownRef, Option.some(true));
+              yield* Ref.set(notificationShownRef, Option.some(true));
 
-            ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.`, "info");
-          }))),
+              ctx.ui.notify(`WebMCP: New tool(s) discovered for ${formatAddedOrigins(diff)}.`, "info");
+            }))
+          ),
           Stream.runDrain,
           Effect.forkDetach,
         );
       });
 
       return PiWebMcpCommandService.of({
-        handle: (args) => Effect.gen(function* () {
-          const ctx = yield* PiContext;
+        handle: (args) =>
+          Effect.gen(function*() {
+            const ctx = yield* PiContext;
 
-          const result = Schema.decodeUnknownResult(CommandArgs)(args);
+            const result = Schema.decodeUnknownResult(CommandArgs)(args);
 
-          if (Result.isFailure(result)) {
-            ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join("|")}]`, "error");
-            return;
-          }
+            if (Result.isFailure(result)) {
+              ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join("|")}]`, "error");
+              return;
+            }
 
-          const command = result.success;
+            const command = result.success;
 
-          if (command === "disconnect") {
-            return yield* disconnect();
-          }
+            if (command === "disconnect") {
+              return yield* disconnect();
+            }
 
-          if (command === "list") {
-            return yield* list();
-          }
+            if (command === "list") {
+              return yield* list();
+            }
 
-          yield* connect();
-        }),
+            yield* connect();
+          }),
         nudge: () => SubscriptionRef.set(nudges, Symbol()),
       });
     }),

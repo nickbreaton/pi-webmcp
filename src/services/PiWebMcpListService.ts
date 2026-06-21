@@ -18,7 +18,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
 }>()("pi-webmcp/PiWebMcpListService") {
   static readonly live = Layer.effect(
     PiWebMcpListService,
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       const browser = yield* BrowserClient;
       const responses = yield* PiWebMcpResponseService;
       const toolState = yield* PiWebMcpToolStateService;
@@ -61,7 +61,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
         return Option.some(`\n${sections.join("\n\n")}`);
       };
 
-      const markdown = Effect.fn("PiWebMcpListService.markdown")(function* (params: PiWebMcpListParams) {
+      const markdown = Effect.fn("PiWebMcpListService.markdown")(function*(params: PiWebMcpListParams) {
         const cdp = yield* browser.get;
 
         if (Option.isNone(cdp)) {
@@ -81,7 +81,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
         return formatToolList(tools);
       });
 
-      const fallbackMessage = Effect.fn("PiWebMcpListService.fallbackMessage")(function* () {
+      const fallbackMessage = Effect.fn("PiWebMcpListService.fallbackMessage")(function*() {
         const cdp = yield* browser.get;
 
         if (Option.isNone(cdp)) {
@@ -93,7 +93,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
 
       return PiWebMcpListService.of({
         markdown,
-        execute: Effect.fn(function* (params) {
+        execute: Effect.fn(function*(params) {
           const maybeMarkdown = yield* markdown(params);
           const text = Option.isSome(maybeMarkdown) ? maybeMarkdown.value : yield* fallbackMessage();
 
