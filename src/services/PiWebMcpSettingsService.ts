@@ -4,8 +4,8 @@ import { Origin } from "../schemas/WebMcpTool";
 import { PiContext } from "./PiApi";
 
 export class PiWebMcpSettings extends Schema.Class<PiWebMcpSettings>("pi-webmcp/PiWebMcpSettings")({
-  allowedOrigins: Schema.optionalKey(Schema.ReadonlySet(Schema.String)),
-  disallowedOrigins: Schema.optionalKey(Schema.ReadonlySet(Schema.String)),
+  allowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
+  disallowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
 }) { }
 
 class PiSettings extends Schema.Class<PiSettings>("pi-webmcp/PiSettings")({
@@ -31,8 +31,8 @@ export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsSer
         }
       };
 
-      const normalizeOrigins = (origins: ReadonlySet<string>): ReadonlySet<Origin> => {
-        return new Set(origins.values().map(normalizeOrigin));
+      const normalizeOrigins = (origins: ReadonlyArray<string>): ReadonlySet<Origin> => {
+        return new Set(origins.map(normalizeOrigin));
       };
 
       const globalSettings = yield* Schema.decodeUnknownEffect(PiSettings)(manager.getGlobalSettings());
