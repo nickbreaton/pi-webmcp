@@ -58,7 +58,7 @@ Configure WebMCP options under the `webmcp` key in Pi settings, either globally 
 | Option | Description |
 |--------|-------------|
 | `webmcp.allowedOrigins` | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
-| `webmcp.disallowOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
+| `webmcp.disallowedOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins. |
 
 ## Browser Support
 
