@@ -32,7 +32,7 @@ export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsSer
       };
 
       const normalizeOrigins = (origins: ReadonlySet<string>): ReadonlySet<Origin> => {
-        return new Set([...origins].map(normalizeOrigin));
+        return new Set(origins.values().map(normalizeOrigin));
       };
 
       const globalSettings = yield* Schema.decodeUnknownEffect(PiSettings)(manager.getGlobalSettings());
