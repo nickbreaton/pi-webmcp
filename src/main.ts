@@ -13,7 +13,6 @@ import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
-import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
 import { PiWebMcpServeService } from "./services/PiWebMcpServeService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
@@ -26,7 +25,6 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiWebMcpDescribeService.live),
     Layer.provideMerge(PiWebMcpExecuteService.live),
     Layer.provideMerge(PiWebMcpListService.live),
-    Layer.provideMerge(PiWebMcpResponseService.live),
     Layer.provideMerge(PiWebMcpServeService.live),
     Layer.provideMerge(PiWebMcpSystemPromptService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),

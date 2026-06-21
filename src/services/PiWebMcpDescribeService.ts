@@ -1,6 +1,7 @@
 import { type AgentToolResult, highlightCode } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Formatter, Layer, Option, Schema } from "effect";
 import { Origin, ToolId, WebMcpTool } from "../schemas/WebMcpTool";
+import { agentConnectInstruction } from "../utils/copy";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
@@ -60,7 +61,7 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
           const cdpOption = yield* browser.get;
           if (Option.isNone(cdpOption)) {
             return {
-              content: [{ type: "text", text: "WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools." }],
+              content: [{ type: "text", text: agentConnectInstruction }],
               details: {},
             };
           }

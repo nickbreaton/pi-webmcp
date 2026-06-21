@@ -1,9 +1,9 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
+import { agentConnectInstruction } from "../utils/copy";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
-import { PiWebMcpResponseService } from "./PiWebMcpResponseService";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 
 export type PiWebMcpListParams = {
@@ -20,7 +20,6 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
     PiWebMcpListService,
     Effect.gen(function*() {
       const browser = yield* BrowserClient;
-      const responses = yield* PiWebMcpResponseService;
       const toolState = yield* PiWebMcpToolStateService;
 
       const uniqueTools = (tools: WebMcpTool[]): WebMcpTool[] => {
@@ -85,7 +84,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
         const cdp = yield* browser.get;
 
         if (Option.isNone(cdp)) {
-          return responses.connectInstruction;
+          return agentConnectInstruction;
         }
 
         return "No WebMCP tools found.";
