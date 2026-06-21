@@ -95,7 +95,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
           Effect.as(true),
           Effect.catchTag(
             "BrowserClientError",
-            Effect.fn(function*() {
+            Effect.fn("PiWebMcpCommandService.connect.handleBrowserClientError")(function*() {
               ctx.ui.notify("WebMCP: Failed to connect to Chrome. Make sure Chrome is open with remote debugging enabled.", "error");
               return false;
             }),
@@ -144,30 +144,31 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       });
 
       return PiWebMcpCommandService.of({
-        handle: (args) =>
-          Effect.gen(function*() {
-            const ctx = yield* PiContext;
+        handle: Effect.fn("PiWebMcpCommandService.handle")(function*(args: string) {
+          const ctx = yield* PiContext;
 
-            const result = Schema.decodeUnknownResult(CommandArgs)(args);
+          const result = Schema.decodeUnknownResult(CommandArgs)(args);
 
-            if (Result.isFailure(result)) {
-              ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join("|")}]`, "error");
-              return;
-            }
+          if (Result.isFailure(result)) {
+            ctx.ui.notify(`Usage: /webmcp [${Subcommand.literals.join("|")}]`, "error");
+            return;
+          }
 
-            const command = result.success;
+          const command = result.success;
 
-            if (command === "disconnect") {
-              return yield* disconnect();
-            }
+          if (command === "disconnect") {
+            return yield* disconnect();
+          }
 
-            if (command === "list") {
-              return yield* list();
-            }
+          if (command === "list") {
+            return yield* list();
+          }
 
-            yield* connect();
-          }),
-        nudge: () => SubscriptionRef.set(nudges, Symbol()),
+          yield* connect();
+        }),
+        nudge: Effect.fn("PiWebMcpCommandService.nudge")(function*() {
+          yield* SubscriptionRef.set(nudges, Symbol());
+        }),
       });
     }),
   );

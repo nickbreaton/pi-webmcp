@@ -56,37 +56,36 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
       };
 
       return PiWebMcpDescribeService.of({
-        execute: (params) =>
-          Effect.gen(function*() {
-            const cdpOption = yield* browser.get;
-            if (Option.isNone(cdpOption)) {
-              return {
-                content: [{ type: "text", text: "WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools." }],
-                details: {},
-              };
-            }
+        execute: Effect.fn("PiWebMcpDescribeService.execute")(function*(params: PiWebMcpDescribeParams) {
+          const cdpOption = yield* browser.get;
+          if (Option.isNone(cdpOption)) {
+            return {
+              content: [{ type: "text", text: "WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools." }],
+              details: {},
+            };
+          }
 
-            const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
-            const origin = Schema.decodeUnknownSync(Origin)(params.origin);
-            const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
-            const resolved = resolveTool(activeTools, toolId, origin);
-            if ("candidates" in resolved) {
-              return {
-                content: [{
-                  type: "text",
-                  text: resolved.candidates.length > 0
-                    ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}`
-                    : `Tool not found: ${params.tool}. Try webmcp_list first.`,
-                }],
-                details: {},
-              };
-            }
+          const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
+          const origin = Schema.decodeUnknownSync(Origin)(params.origin);
+          const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
+          const resolved = resolveTool(activeTools, toolId, origin);
+          if ("candidates" in resolved) {
+            return {
+              content: [{
+                type: "text",
+                text: resolved.candidates.length > 0
+                  ? `Ambiguous tool. Provide origin.\n\n${listToolsText(resolved.candidates)}`
+                  : `Tool not found: ${params.tool}. Try webmcp_list first.`,
+              }],
+              details: {},
+            };
+          }
 
-            const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
-            const highlightedInputSchema = highlightCode(inputSchema, "json").join("\n");
-            const text = `\n${resolved.description ?? "(no description)"}\n\n${highlightedInputSchema}`;
-            return { content: [{ type: "text", text }], details: {} };
-          }),
+          const inputSchema = Formatter.formatJson(Schema.encodeSync(Schema.Json)(resolved.inputSchema ?? {}), { space: 2 });
+          const highlightedInputSchema = highlightCode(inputSchema, "json").join("\n");
+          const text = `\n${resolved.description ?? "(no description)"}\n\n${highlightedInputSchema}`;
+          return { content: [{ type: "text", text }], details: {} };
+        }),
       });
     }),
   );

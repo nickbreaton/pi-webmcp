@@ -93,7 +93,7 @@ export class PiWebMcpListService extends Context.Service<PiWebMcpListService, {
 
       return PiWebMcpListService.of({
         markdown,
-        execute: Effect.fn(function*(params) {
+        execute: Effect.fn("PiWebMcpListService.execute")(function*(params: PiWebMcpListParams) {
           const maybeMarkdown = yield* markdown(params);
           const text = Option.isSome(maybeMarkdown) ? maybeMarkdown.value : yield* fallbackMessage();
 

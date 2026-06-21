@@ -111,8 +111,8 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
       const toolState = yield* PiWebMcpToolStateService;
 
       return PiWebMcpExecuteService.of({
-        execute: (params) =>
-          Effect.gen(function*() {
+        execute: Effect.fn("PiWebMcpExecuteService.execute")(
+          function*(params: PiWebMcpExecuteParams) {
             const cdpOption = yield* browser.get;
             if (Option.isNone(cdpOption)) {
               return textResult("WebMCP is not connected. Ask the user to run `/webmcp` before using WebMCP tools.", { connected: false });
@@ -143,7 +143,9 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
               input,
               result,
             });
-          }).pipe(Effect.catch((cause: unknown) => Effect.succeed(textResult(String(cause instanceof Error ? cause.message : cause), { error: "execute_failed" })))),
+          },
+          (effect) => effect.pipe(Effect.catch((cause: unknown) => Effect.succeed(textResult(String(cause instanceof Error ? cause.message : cause), { error: "execute_failed" })))),
+        ),
       });
     }),
   );

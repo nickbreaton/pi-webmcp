@@ -44,7 +44,7 @@ export class PiWebMcpSystemPromptService extends Context.Service<PiWebMcpSystemP
       const toolDiff = yield* WebMcpToolDiffService;
 
       return PiWebMcpSystemPromptService.of({
-        getSystemPrompt: Effect.fn(function*() {
+        getSystemPrompt: Effect.fn("PiWebMcpSystemPromptService.getSystemPrompt")(function*() {
           const cdp = yield* browser.get;
 
           if (Option.isNone(cdp)) {

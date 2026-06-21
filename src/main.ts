@@ -163,7 +163,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   pi.on("message_end", async (event) => {
     if (event.message.role !== "user") return;
 
-    const tools = await runtime.runPromise(PiWebMcpToolStateService.use((service) => service.commit));
+    const tools = await runtime.runPromise(PiWebMcpToolStateService.use((service) => service.commit()));
     if (Option.isNone(tools)) return;
 
     const messageWithDetails = event.message as typeof event.message & { details?: Record<string, unknown>; };

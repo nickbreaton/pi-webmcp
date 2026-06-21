@@ -5,7 +5,7 @@ import { PiContext } from "./PiApi";
 export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateService, {
   readonly stage: (tools: WebMcpTool[]) => Effect.Effect<void>;
   readonly staged: Effect.Effect<WebMcpTool[]>;
-  readonly commit: Effect.Effect<Option.Option<WebMcpTool[]>>;
+  readonly commit: () => Effect.Effect<Option.Option<WebMcpTool[]>>;
   readonly committed: Effect.Effect<WebMcpTool[], never, PiContext>;
 }>()("pi-webmcp/PiWebMcpToolStateService") {
   static readonly live = Layer.effect(
@@ -14,9 +14,16 @@ export class PiWebMcpToolStateService extends Context.Service<PiWebMcpToolStateS
       const stagedRef = yield* Ref.make<Option.Option<WebMcpTool[]>>(Option.none());
 
       return PiWebMcpToolStateService.of({
-        stage: (tools) => Ref.set(stagedRef, Option.some(tools)),
-        staged: Ref.get(stagedRef).pipe(Effect.map(Option.getOrElse(() => []))),
-        commit: Ref.getAndSet(stagedRef, Option.none()),
+        stage: Effect.fn("PiWebMcpToolStateService.stage")(function*(tools: WebMcpTool[]) {
+          yield* Ref.set(stagedRef, Option.some(tools));
+        }),
+        staged: Effect.gen(function*() {
+          const tools = yield* Ref.get(stagedRef);
+          return Option.getOrElse(tools, () => []);
+        }),
+        commit: Effect.fn("PiWebMcpToolStateService.commit")(function*() {
+          return yield* Ref.getAndSet(stagedRef, Option.none());
+        }),
         committed: Effect.gen(function*() {
           const ctx = yield* PiContext;
           const branch = ctx.sessionManager.getBranch();

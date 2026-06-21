@@ -116,8 +116,8 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
       }));
 
       return PiWebMcpServeService.of({
-        execute: (params) =>
-          Effect.gen(function*() {
+        execute: Effect.fn("PiWebMcpServeService.execute")(
+          function*(params: PiWebMcpServeParams) {
             const ctx = yield* PiContext;
             const server = yield* startServer;
             const resolvedPath = path.isAbsolute(params.path)
@@ -159,14 +159,17 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
               }],
               details: {},
             };
-          }).pipe(
-            Effect.catch((cause: unknown) =>
-              Effect.succeed({
-                content: [{ type: "text" as const, text: `Failed to serve path: ${cause instanceof Error ? cause.message : String(cause)}` }],
-                details: {},
-              })
+          },
+          (effect) =>
+            effect.pipe(
+              Effect.catch((cause: unknown) =>
+                Effect.succeed({
+                  content: [{ type: "text" as const, text: `Failed to serve path: ${cause instanceof Error ? cause.message : String(cause)}` }],
+                  details: {},
+                })
+              ),
             ),
-          ),
+        ),
       });
     }),
   );
