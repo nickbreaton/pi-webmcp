@@ -11,6 +11,8 @@
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "fmt": "dprint fmt",
     "fmt:check": "dprint check"
   },
@@ -29,11 +31,13 @@
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.78.1",
     "@earendil-works/pi-tui": "^0.78.1",
+    "@effect/vitest": "4.0.0-beta.84",
     "@types/chrome-remote-interface": "^0.34.0",
     "@types/node": "^25.9.2",
     "dprint": "^0.54.0",
     "typebox": "^1.2.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   },
   "pi": {
     "extensions": [
