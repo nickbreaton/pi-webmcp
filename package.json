@@ -1,6 +1,6 @@
 {
   "name": "pi-webmcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "license": "MIT",
   "description": "A Pi extension that connects Pi to webpages that register WebMCP tools.",
