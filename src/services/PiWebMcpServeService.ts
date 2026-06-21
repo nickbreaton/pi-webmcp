@@ -1,6 +1,6 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
 import { NodeHttpServer } from "@effect/platform-node";
-import { Context, Crypto, Effect, FileSystem, Layer, Path, Ref, Scope } from "effect";
+import { Context, Effect, FileSystem, Layer, Path, Ref, Scope } from "effect";
 import { HttpPlatform, HttpServer, HttpServerRequest, HttpServerRespondable, HttpServerResponse, HttpStaticServer } from "effect/unstable/http";
 import { PiContext } from "./PiApi";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
@@ -10,7 +10,6 @@ export type PiWebMcpServeParams = {
 };
 
 type Mount = {
-  readonly id: string;
   readonly root: string;
   readonly kind: "file" | "directory";
   readonly fileName?: string;
@@ -46,10 +45,9 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
       const fileSystem = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const httpPlatform = yield* HttpPlatform.HttpPlatform;
-      const crypto = yield* Crypto.Crypto;
       const piContext = yield* PiContext;
       const toolState = yield* PiWebMcpToolStateService;
-      const mountsRef = yield* Ref.make(new Map<string, Mount>());
+      const mountsRef = yield* Ref.make<Mount[]>([]);
 
       const app = Effect.gen(function* () {
         const request = yield* HttpServerRequest.HttpServerRequest;
@@ -66,15 +64,15 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
         }
 
         const url = new URL(request.url, "http://localhost");
-        const id = url.pathname.split("/").filter(Boolean)[0];
+        const index = Number(url.pathname.split("/").filter(Boolean)[0]);
         const mounts = yield* Ref.get(mountsRef);
-        const mount = id ? mounts.get(id) : undefined;
+        const mount = Number.isInteger(index) && index >= 0 ? mounts[index] : undefined;
 
         if (!mount) {
           return withCorsOrigins(request, HttpServerResponse.text("Not found", { status: 404 }), allowedOrigins);
         }
 
-        const prefix = `/${mount.id}`;
+        const prefix = `/${index}`;
         const suffix = url.pathname === prefix ? "/" : url.pathname.slice(prefix.length);
         let rewrittenUrl: string;
 
@@ -133,24 +131,20 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
             };
           }
 
-          const id = yield* crypto.randomUUIDv4;
           const mount: Mount = stat.type === "File"
             ? {
-              id,
               root: path.dirname(resolvedPath),
               kind: "file",
               fileName: path.basename(resolvedPath),
             }
             : {
-              id,
               root: resolvedPath,
               kind: "directory",
             };
 
-          yield* Ref.update(mountsRef, (mounts) => {
-            const next = new Map(mounts);
-            next.set(id, mount);
-            return next;
+          const id = yield* Ref.modify(mountsRef, (mounts) => {
+            const next = [...mounts, mount];
+            return [String(next.length - 1), next] as const;
           });
 
           return {
