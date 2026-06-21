@@ -6,10 +6,15 @@ import { PiWebMcpSettingsService } from "../src/services/PiWebMcpSettingsService
 
 const origin = (value: string): Origin => Schema.decodeSync(Origin)(value);
 
-const makeSettingsLayer = (
-  allowedOrigins: Option.Option<ReadonlySet<Origin>>,
-  disallowedOrigins: Option.Option<ReadonlySet<Origin>>,
-): Layer.Layer<PiWebMcpSettingsService> =>
+interface MakeSettingsLayerOptions {
+  readonly allowedOrigins: Option.Option<ReadonlySet<Origin>>;
+  readonly disallowedOrigins: Option.Option<ReadonlySet<Origin>>;
+}
+
+const makeSettingsLayer = ({
+  allowedOrigins,
+  disallowedOrigins,
+}: MakeSettingsLayerOptions): Layer.Layer<PiWebMcpSettingsService> =>
   Layer.succeed(
     PiWebMcpSettingsService,
     PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins }),
@@ -23,7 +28,12 @@ describe("PiWebMcpAllowedOriginService", () => {
     }).pipe(
       Effect.provide(
         PiWebMcpAllowedOriginService.liveWithoutDependencies.pipe(
-          Layer.provide(makeSettingsLayer(Option.none(), Option.none())),
+          Layer.provide(
+            makeSettingsLayer({
+              allowedOrigins: Option.none(),
+              disallowedOrigins: Option.none(),
+            }),
+          ),
         ),
       ),
     ));
@@ -37,10 +47,10 @@ describe("PiWebMcpAllowedOriginService", () => {
       Effect.provide(
         PiWebMcpAllowedOriginService.liveWithoutDependencies.pipe(
           Layer.provide(
-            makeSettingsLayer(
-              Option.some(new Set([origin("example.com")])),
-              Option.none(),
-            ),
+            makeSettingsLayer({
+              allowedOrigins: Option.some(new Set([origin("example.com")])),
+              disallowedOrigins: Option.none(),
+            }),
           ),
         ),
       ),
@@ -54,10 +64,10 @@ describe("PiWebMcpAllowedOriginService", () => {
       Effect.provide(
         PiWebMcpAllowedOriginService.liveWithoutDependencies.pipe(
           Layer.provide(
-            makeSettingsLayer(
-              Option.some(new Set([origin("example.com"), origin("evil.com")])),
-              Option.some(new Set([origin("evil.com")])),
-            ),
+            makeSettingsLayer({
+              allowedOrigins: Option.some(new Set([origin("example.com"), origin("evil.com")])),
+              disallowedOrigins: Option.some(new Set([origin("evil.com")])),
+            }),
           ),
         ),
       ),
