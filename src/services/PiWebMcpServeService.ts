@@ -17,11 +17,18 @@ type Mount = {
 };
 
 function withCorsOrigins(
+  request: HttpServerRequest.HttpServerRequest,
   response: HttpServerResponse.HttpServerResponse,
   allowedOrigins: ReadonlySet<string>,
 ) {
+  const requestOrigin = request.headers.origin;
+
+  if (!requestOrigin || !allowedOrigins.has(requestOrigin)) {
+    return response;
+  }
+
   return HttpServerResponse.setHeaders(response, {
-    "Access-Control-Allow-Origin": [...allowedOrigins].join(", "),
+    "Access-Control-Allow-Origin": requestOrigin,
     "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
     "Access-Control-Allow-Headers": "Range, Content-Type, Accept, Origin",
     "Access-Control-Expose-Headers": "Content-Length, Content-Range, Accept-Ranges, ETag, Last-Modified",
@@ -51,7 +58,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
         const allowedOrigins = new Set([...committedTools, ...stagedTools].map((tool) => `https://${tool.origin}`));
 
         if (request.method === "OPTIONS") {
-          return withCorsOrigins(HttpServerResponse.empty({ status: 204 }), allowedOrigins);
+          return withCorsOrigins(request, HttpServerResponse.empty({ status: 204 }), allowedOrigins);
         }
 
         if (request.method !== "GET" && request.method !== "HEAD") {
@@ -64,7 +71,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
         const mount = id ? mounts.get(id) : undefined;
 
         if (!mount) {
-          return withCorsOrigins(HttpServerResponse.text("Not found", { status: 404 }), allowedOrigins);
+          return withCorsOrigins(request, HttpServerResponse.text("Not found", { status: 404 }), allowedOrigins);
         }
 
         const prefix = `/${mount.id}`;
@@ -78,7 +85,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
         } else if (decodeURIComponent(suffix.startsWith("/") ? suffix.slice(1) : suffix) === mount.fileName) {
           rewrittenUrl = `${suffix}${url.search}`;
         } else {
-          return withCorsOrigins(HttpServerResponse.text("Forbidden", { status: 403 }), allowedOrigins);
+          return withCorsOrigins(request, HttpServerResponse.text("Forbidden", { status: 403 }), allowedOrigins);
         }
 
         const staticApp = yield* HttpStaticServer.make({ root: mount.root });
@@ -88,7 +95,7 @@ export class PiWebMcpServeService extends Context.Service<PiWebMcpServeService, 
           Effect.catch((error: unknown) => HttpServerRespondable.toResponseOrElse(error, HttpServerResponse.text("Not found", { status: 404 }))),
         );
 
-        return withCorsOrigins(response, allowedOrigins);
+        return withCorsOrigins(request, response, allowedOrigins);
       });
 
       const startServer = yield* Effect.cached(Effect.gen(function* () {
