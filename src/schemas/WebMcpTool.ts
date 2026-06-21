@@ -12,9 +12,11 @@ export class WebMcpToolMetadata extends Schema.Class<WebMcpToolMetadata>("WebMcp
   url: Schema.String,
 }) { }
 
-export class Origin extends Schema.asClass(Schema.String.pipe(Schema.brand("Origin"))) { }
+export const Origin = Schema.String.pipe(Schema.brand("Origin"));
+export type Origin = typeof Origin.Type
 
-export class ToolId extends Schema.asClass(Schema.String.pipe(Schema.brand("ToolId"))) { }
+export const ToolId = Schema.String.pipe(Schema.brand("ToolId"));
+export type ToolId = typeof ToolId.Type;
 
 export class WebMcpTool extends Schema.Class<WebMcpTool>("WebMcpTool")({
   name: Schema.String,

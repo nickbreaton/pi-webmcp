@@ -1,9 +1,10 @@
 import { getMarkdownTheme, keyText, type AgentToolResult, type Theme, type ToolRenderResultOptions } from "@earendil-works/pi-coding-agent";
 import { Markdown, Text } from "@earendil-works/pi-tui";
+import type { Origin } from "../schemas/WebMcpTool";
 
 export type PiWebMcpRenderCallOptions = {
   readonly toolName: string;
-  readonly origin?: string;
+  readonly origin?: Origin;
   readonly webMcpTool?: string;
   readonly target?: string;
 };

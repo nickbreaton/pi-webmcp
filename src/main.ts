@@ -19,7 +19,7 @@ import { PiTurnRefService } from "./services/PiTurnRefService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult, renderPiWebMcpServeResult } from "./utils/renderers";
-import { WebMcpTools } from "./schemas/WebMcpTool";
+import { Origin, WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
@@ -62,7 +62,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     }),
     renderCall: (args, theme) => renderPiWebMcpCall(theme, {
       toolName: "webmcp_execute",
-      origin: args.origin,
+      origin: Schema.decodeUnknownSync(Origin)(args.origin),
       webMcpTool: args.tool,
     }),
     renderResult: renderPiWebMcpResult,
@@ -108,7 +108,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     }),
     renderCall: (args, theme) => renderPiWebMcpCall(theme, {
       toolName: "webmcp_describe",
-      origin: args.origin,
+      origin: Schema.decodeUnknownSync(Origin)(args.origin),
       webMcpTool: args.tool,
     }),
     renderResult: renderPiWebMcpResult,
