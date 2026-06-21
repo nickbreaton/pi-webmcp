@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { NodeHttpServer } from "@effect/platform-node";
-import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
+import { Layer, ManagedRuntime, Option, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
