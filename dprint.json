@@ -28,6 +28,8 @@
   },
   "includes": [
     "src/**/*.ts",
+    "test/**/*.ts",
+    "vitest.config.ts",
     ".pi/extensions/**/*.ts",
     "*.json",
     "README.md",
