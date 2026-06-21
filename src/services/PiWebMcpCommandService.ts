@@ -3,6 +3,7 @@ import { Container, Markdown, Spacer } from "@earendil-works/pi-tui";
 import { Context, Effect, Layer, Option, Ref, Result, Schema, SchemaTransformation, Stream, SubscriptionRef } from "effect";
 import { BrowserClient } from "./BrowserClient";
 import { PiContext } from "./PiApi";
+import { PiWebMcpAllowedOriginService } from "./PiWebMcpAllowedOriginService";
 import { PiWebMcpListService } from "./PiWebMcpListService";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 import { PiTurnRefService } from "./PiTurnRefService";
@@ -44,6 +45,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const toolState = yield* PiWebMcpToolStateService;
       const listService = yield* PiWebMcpListService;
       const tools = yield* WebMcpToolsService;
+      const allowedOrigin = yield* PiWebMcpAllowedOriginService;
       const toolDiff = yield* WebMcpToolDiffService;
       const turnRefService = yield* PiTurnRefService;
       const notificationShownRef = yield* turnRefService.make(Option.some(true))
@@ -98,6 +100,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
         if (!connected) return;
 
         yield* tools.changes.pipe(
+          Stream.map((tools) => tools.filter((tool) => allowedOrigin.isAllowed(tool.origin))),
           Stream.zipLatestWith(SubscriptionRef.changes(nudges), (tools) => tools),
           // Stage every change immediately so the registry stays current.
           Stream.tap(active => toolState.stage(active)),
@@ -164,8 +167,9 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
   static readonly live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provide(PiWebMcpListService.live),
     Layer.provide(PiWebMcpToolStateService.live),
-    Layer.provide(PiTurnRefService.live),
     Layer.provide(WebMcpToolsService.live),
+    Layer.provide(PiTurnRefService.live),
+    Layer.provide(PiWebMcpAllowedOriginService.live),
     Layer.provide(WebMcpToolDiffService.live),
   );
 }

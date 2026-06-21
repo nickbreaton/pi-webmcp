@@ -5,6 +5,7 @@ import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { BrowserClient } from "./services/BrowserClient";
 import { PiApi, PiContext } from "./services/PiApi";
+import { PiWebMcpAllowedOriginService } from "./services/PiWebMcpAllowedOriginService";
 import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
@@ -36,6 +37,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiTurnRefService.live),
     Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
+    Layer.provideMerge(PiWebMcpAllowedOriginService.live),
     Layer.provideMerge(Layer.mergeAll(
       Layer.succeed(PiApi, pi),
       Layer.succeed(PiContext, piContext),
