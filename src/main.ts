@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { NodeHttpServer } from "@effect/platform-node";
 import { Layer, ManagedRuntime, Option, Schema } from "effect";
 import { memoize } from "micro-memoize";
@@ -11,21 +11,16 @@ import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpResponseService } from "./services/PiWebMcpResponseService";
-import { PiWebMcpServeService, type PiWebMcpServeParams } from "./services/PiWebMcpServeService";
+import { PiWebMcpServeService } from "./services/PiWebMcpServeService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
 import { PiTurnRefService } from "./services/PiTurnRefService";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
-import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult } from "./utils/renderers";
+import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult, renderPiWebMcpServeResult } from "./utils/renderers";
 import { WebMcpTools } from "./schemas/WebMcpTool";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
-  let currentContext = ctx;
-  const piContext = new Proxy({} as ExtensionCommandContext, {
-    get: (_, property) => currentContext[property as keyof ExtensionCommandContext],
-  });
-
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provideMerge(PiWebMcpDescribeService.live),
     Layer.provideMerge(PiWebMcpExecuteService.live),
@@ -40,7 +35,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiWebMcpAllowedOriginService.live),
     Layer.provideMerge(Layer.mergeAll(
       Layer.succeed(PiApi, pi),
-      Layer.succeed(PiContext, piContext),
+      Layer.succeed(PiContext, ctx),
       BrowserClient.live,
       NodeHttpServer.layerHttpServices,
     )),
@@ -121,6 +116,29 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     },
   });
 
+  pi.registerTool({
+    name: "webmcp_serve",
+    label: "WebMCP Serve",
+    description: "Serve a local file or folder over HTTP so WebMCP pages can reference it.",
+    promptSnippet: "Serve a local file or folder and return a browser-accessible URL",
+    promptGuidelines: [
+      "Use webmcp_serve when a WebMCP page needs to fetch or embed a local file or folder from this session.",
+      "Pass a file or directory path. Relative paths resolve from the current Pi working directory.",
+      "The returned URL remains available for the normal Pi application lifecycle.",
+    ],
+    parameters: Type.Object({
+      path: Type.String({ description: "File or directory path to serve. Relative paths resolve from the current Pi working directory." }),
+    }),
+    renderCall: (args, theme) => renderPiWebMcpCall(theme, {
+      toolName: "webmcp_serve",
+      target: args.path,
+    }),
+    renderResult: renderPiWebMcpServeResult,
+    async execute(_, params) {
+      return runtime.runPromise(PiWebMcpServeService.use(service => service.execute(params)));
+    },
+  });
+
   pi.on('turn_end', async () => {
     await runtime.runPromise(PiTurnRefService.use(service => service.reset()))
   });
@@ -168,29 +186,15 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     await runtime.dispose();
   });
 
-  return {
-    runtime,
-    setContext: (ctx: ExtensionCommandContext) => {
-      currentContext = ctx;
-    },
-  };
+  return { runtime };
 }, { transformKey: () => ["pi-webmcp-runtime"] });
 
 export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionCommandContext) {
-  const { runtime, setContext } = init(pi, ctx);
-  setContext(ctx);
+  const { runtime } = init(pi, ctx);
 
   const effect = PiWebMcpCommandService.use(service => {
     return service.handle(args);
   });
 
   await runtime.runPromise(effect);
-}
-
-export async function serve(pi: ExtensionAPI, params: PiWebMcpServeParams, ctx: ExtensionContext) {
-  const commandContext = ctx as ExtensionCommandContext;
-  const { runtime, setContext } = init(pi, commandContext);
-  setContext(commandContext);
-
-  return runtime.runPromise(PiWebMcpServeService.use(service => service.execute(params)));
 }
