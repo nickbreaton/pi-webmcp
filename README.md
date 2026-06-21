@@ -15,7 +15,7 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 ## Demo
 
 <a href="https://www.youtube.com/watch?v=hYOu47F-NF8">
-  <img width="600" alt="Demo video thumbnail" src="https://github.com/user-attachments/assets/0b95eeee-5cf2-44eb-aa6f-07a9718c4d80" />
+  <img width="600" alt="Demo video thumbnail" src="https://github.com/user-attachments/assets/93698e7d-d6be-4752-b96e-3094e2a79b1a" />
 </a>
 
 
