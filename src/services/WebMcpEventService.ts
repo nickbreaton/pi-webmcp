@@ -1,5 +1,5 @@
 import { Context, Effect, Layer, Queue, Result, Schema, Stream } from "effect";
-import { Origin, WebMcpTool } from "../schemas/WebMcpTool";
+import { WebMcpTool } from "../schemas/WebMcpTool";
 import { BrowserClient } from "./BrowserClient";
 
 export const WebMcpEventToolAdded = Schema.TaggedStruct("WebMcpEventToolAdded", {
@@ -67,7 +67,7 @@ export class WebMcpEventService extends Context.Service<WebMcpEventService, {
               if (!sessionId) return;
               const target = targetBySession.get(sessionId);
               if (!target) throw new Error(`Missing target info for WebMCP session: ${sessionId}`);
-              const origin = Schema.decodeSync(Origin)(target.url.host);
+              const origin = target.url.host;
               for (const tool of ev.tools ?? []) {
                 const result = Schema.decodeUnknownResult(WebMcpTool)({ ...tool, origin, sessionId });
                 if (Result.isFailure(result)) continue;
