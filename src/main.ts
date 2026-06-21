@@ -47,32 +47,6 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
   pi.registerMessageRenderer("webmcp-list", renderPiWebMcpListMessage);
 
   pi.registerTool({
-    name: "webmcp_execute",
-    label: "WebMCP Execute",
-    description: "Execute a WebMCP tool exposed by an open Chrome tab.",
-    promptSnippet: "Execute a selected WebMCP page tool with JSON arguments",
-    promptGuidelines: [
-      "Before using webmcp_execute, ask the user to run /webmcp if WebMCP is not connected or no matching tool is known.",
-      "When calling webmcp_execute, pass the page-provided tool name or the safe tool id, and always include the origin from webmcp_list.",
-    ],
-    parameters: Type.Object({
-      tool: Type.String({ description: "Tool id or page-provided WebMCP tool name." }),
-      origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
-      args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
-    }),
-    renderCall: (args, theme) =>
-      renderPiWebMcpCall(theme, {
-        toolName: "webmcp_execute",
-        origin: Schema.decodeUnknownSync(Origin)(args.origin),
-        webMcpTool: Schema.decodeUnknownSync(ToolId)(args.tool),
-      }),
-    renderResult: renderPiWebMcpResult,
-    async execute(_toolCallId, params) {
-      return runtime.runPromise(PiWebMcpExecuteService.use((service) => service.execute(params)));
-    },
-  });
-
-  pi.registerTool({
     name: "webmcp_list",
     label: "WebMCP List",
     description: "List the WebMCP tools currently known to the session, grouped by origin. Does not scan the browser.",
@@ -117,6 +91,32 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     renderResult: renderPiWebMcpResult,
     async execute(_, params) {
       return runtime.runPromise(PiWebMcpDescribeService.use((service) => service.execute(params)));
+    },
+  });
+
+  pi.registerTool({
+    name: "webmcp_execute",
+    label: "WebMCP Execute",
+    description: "Execute a WebMCP tool exposed by an open Chrome tab.",
+    promptSnippet: "Execute a selected WebMCP page tool with JSON arguments",
+    promptGuidelines: [
+      "Before using webmcp_execute, ask the user to run /webmcp if WebMCP is not connected or no matching tool is known.",
+      "When calling webmcp_execute, pass the page-provided tool name or the safe tool id, and always include the origin from webmcp_list.",
+    ],
+    parameters: Type.Object({
+      tool: Type.String({ description: "Tool id or page-provided WebMCP tool name." }),
+      origin: Type.String({ description: "Origin/host where the tool is registered, without protocol (e.g. example.com)." }),
+      args: Type.Optional(Type.String({ description: "Arguments as a JSON object string for the WebMCP tool." })),
+    }),
+    renderCall: (args, theme) =>
+      renderPiWebMcpCall(theme, {
+        toolName: "webmcp_execute",
+        origin: Schema.decodeUnknownSync(Origin)(args.origin),
+        webMcpTool: Schema.decodeUnknownSync(ToolId)(args.tool),
+      }),
+    renderResult: renderPiWebMcpResult,
+    async execute(_toolCallId, params) {
+      return runtime.runPromise(PiWebMcpExecuteService.use((service) => service.execute(params)));
     },
   });
 
