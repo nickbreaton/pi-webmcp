@@ -1,5 +1,5 @@
 import type { AgentToolResult } from "@earendil-works/pi-coding-agent";
-import { NodeHttpServer } from "@effect/platform-node";
+import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { Context, Effect, FileSystem, Layer, Path, Ref, Scope } from "effect";
 import { HttpPlatform, HttpServer, HttpServerRequest, HttpServerRespondable, HttpServerResponse, HttpStaticServer } from "effect/unstable/http";
 import { PiContext } from "./PiApi";
