@@ -12,6 +12,13 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
 >
 > Use at your own risk. Consider setting `allowedOrigins` to restrict which webpages Pi can connect to.
 
+## Demo
+
+<a href="https://www.youtube.com/watch?v=hYOu47F-NF8">
+  <img width="600" alt="Demo video thumbnail" src="https://github.com/user-attachments/assets/0b95eeee-5cf2-44eb-aa6f-07a9718c4d80" />
+</a>
+
+
 ## First-time Setup
 
 1. Install this extension via npm.
