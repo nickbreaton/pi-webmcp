@@ -39,9 +39,9 @@ function listToolsText(tools: WebMcpTool[]) {
     .join("\n");
 }
 
-function resolveTool(tools: WebMcpTool[], name: string, origin?: Origin) {
+function resolveTool(tools: WebMcpTool[], id: ToolId, origin?: Origin) {
   const candidates = tools.filter((tool) =>
-    (tool.id === name || tool.name === name) && (!origin || tool.origin === origin),
+    (tool.id === id || tool.name === id) && (!origin || tool.origin === origin),
   );
 
   return candidates.length === 1 ? candidates[0] : { candidates };
@@ -119,7 +119,8 @@ export class PiWebMcpExecuteService extends Context.Service<PiWebMcpExecuteServi
 
           const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
           const origin = Schema.decodeUnknownSync(Origin)(params.origin);
-          const resolved = resolveTool(activeTools, params.tool, origin);
+          const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
+          const resolved = resolveTool(activeTools, toolId, origin);
           if ("candidates" in resolved) {
             return textResult(
               resolved.candidates.length > 0

@@ -49,9 +49,9 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
       // `Result`/`Option` instead of a `{ candidates }` discriminated object.
       // Needs investigation into whether this and PiWebMcpExecuteService's
       // resolveTool should share one service.
-      const resolveTool = (tools: WebMcpTool[], name: string, origin: Origin) => {
+      const resolveTool = (tools: WebMcpTool[], id: ToolId, origin: Origin) => {
         const candidates = tools.filter((tool) =>
-          (tool.id === name || tool.name === name) && tool.origin === origin,
+          (tool.id === id || tool.name === id) && tool.origin === origin,
         );
 
         return candidates.length === 1 ? candidates[0] : { candidates };
@@ -69,7 +69,8 @@ export class PiWebMcpDescribeService extends Context.Service<PiWebMcpDescribeSer
 
           const activeTools = [...yield* toolState.committed, ...yield* toolState.staged];
           const origin = Schema.decodeUnknownSync(Origin)(params.origin);
-          const resolved = resolveTool(activeTools, params.tool, origin);
+          const toolId = Schema.decodeUnknownSync(ToolId)(params.tool);
+          const resolved = resolveTool(activeTools, toolId, origin);
           if ("candidates" in resolved) {
             return {
               content: [{
