@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
 import { Key, matchesKey } from "@earendil-works/pi-tui";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { Layer, ManagedRuntime, Option, Schema } from "effect";
+import { Effect, Layer, ManagedRuntime, Option, Schema } from "effect";
 import { memoize } from "micro-memoize";
 import { Type } from "typebox";
 import { Origin, ToolId, WebMcpTools } from "./schemas/WebMcpTool";
@@ -13,6 +13,7 @@ import { PiWebMcpCommandService } from "./services/PiWebMcpCommandService";
 import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
+import { PiWebMcpListWidgetService } from "./services/PiWebMcpListWidgetService";
 import { PiWebMcpServeService } from "./services/PiWebMcpServeService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
@@ -25,6 +26,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(PiWebMcpDescribeService.live),
     Layer.provideMerge(PiWebMcpExecuteService.live),
     Layer.provideMerge(PiWebMcpListService.live),
+    Layer.provideMerge(PiWebMcpListWidgetService.live),
     Layer.provideMerge(PiWebMcpServeService.live),
     Layer.provideMerge(PiWebMcpSystemPromptService.live),
     Layer.provideMerge(PiWebMcpToolStateService.live),
@@ -146,10 +148,15 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     await runtime.runPromise(PiTurnRefService.use((service) => service.reset()));
   });
 
-  pi.on("before_agent_start", async (event, ctx) => {
-    ctx.ui.setWidget("webmcp-list", undefined);
-
-    const prompt = await runtime.runPromise(PiWebMcpSystemPromptService.use((service) => service.getSystemPrompt()));
+  pi.on("before_agent_start", async (event) => {
+    const prompt = await runtime.runPromise(
+      Effect.gen(function*() {
+        const listWidget = yield* PiWebMcpListWidgetService;
+        const systemPrompt = yield* PiWebMcpSystemPromptService;
+        yield* listWidget.hide();
+        return yield* systemPrompt.getSystemPrompt();
+      }),
+    );
 
     if (!prompt) return;
 
@@ -191,10 +198,23 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
 
   if (ctx.mode === "tui") {
     ctx.ui.onTerminalInput((data) => {
-      if (matchesKey(data, Key.escape)) {
-        ctx.ui.setWidget("webmcp-list", undefined);
+      if (!matchesKey(data, Key.escape)) {
+        return undefined;
       }
-      return undefined;
+
+      return runtime.runSync(
+        Effect.gen(function*() {
+          const listWidget = yield* PiWebMcpListWidgetService;
+          const isVisible = yield* listWidget.isVisible;
+
+          if (!isVisible) {
+            return;
+          }
+
+          yield* listWidget.hide();
+          return { consume: true };
+        }),
+      );
     });
   }
 

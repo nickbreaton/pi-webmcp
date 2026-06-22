@@ -6,6 +6,7 @@ import { PiContext } from "./PiApi";
 import { PiTurnRefService } from "./PiTurnRefService";
 import { PiWebMcpAllowedOriginService } from "./PiWebMcpAllowedOriginService";
 import { PiWebMcpListService } from "./PiWebMcpListService";
+import { PiWebMcpListWidgetService } from "./PiWebMcpListWidgetService";
 import { PiWebMcpToolStateService } from "./PiWebMcpToolStateService";
 import { WebMcpToolDiff, WebMcpToolDiffService } from "./WebMcpToolDiffService";
 import { WebMcpToolsService } from "./WebMcpToolsService";
@@ -42,6 +43,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
     PiWebMcpCommandService,
     Effect.gen(function*() {
       const browser = yield* BrowserClient;
+      const listWidget = yield* PiWebMcpListWidgetService;
       const toolState = yield* PiWebMcpToolStateService;
       const listService = yield* PiWebMcpListService;
       const tools = yield* WebMcpToolsService;
@@ -52,9 +54,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function*() {
-        const ctx = yield* PiContext;
-
-        ctx.ui.setWidget("webmcp-list", undefined);
+        yield* listWidget.hide();
         // TODO: detach active CDP target sessions before disconnecting.
         yield* browser.disconnect().pipe(Effect.ignore);
         yield* toolState.stage([]);
@@ -78,7 +78,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
         const markdownTheme = getMarkdownTheme();
 
-        ctx.ui.setWidget("webmcp-list", () => {
+        yield* listWidget.show(() => {
           const widget = new Container();
           widget.addChild(new Markdown(text.value, 0, 0, markdownTheme));
           widget.addChild(new Spacer(1));
@@ -89,7 +89,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const connect = Effect.fn("PiWebMcpCommandService.connect")(function*() {
         const ctx = yield* PiContext;
 
-        ctx.ui.setWidget("webmcp-list", undefined);
+        yield* listWidget.hide();
 
         const connected = yield* browser.connect({ force: true }).pipe(
           Effect.as(true),
