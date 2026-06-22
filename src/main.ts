@@ -153,7 +153,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       Effect.gen(function*() {
         const listWidget = yield* PiWebMcpListWidgetService;
         const systemPrompt = yield* PiWebMcpSystemPromptService;
-        yield* listWidget.hide();
+        yield* listWidget.clear();
         return yield* systemPrompt.getSystemPrompt();
       }),
     );
@@ -211,7 +211,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
             return;
           }
 
-          yield* listWidget.hide();
+          yield* listWidget.clear();
           return { consume: true };
         }),
       );

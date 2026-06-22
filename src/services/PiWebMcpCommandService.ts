@@ -54,7 +54,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const nudges = yield* SubscriptionRef.make<unknown>(null);
 
       const disconnect = Effect.fn("PiWebMcpCommandService.disconnect")(function*() {
-        yield* listWidget.hide();
+        yield* listWidget.clear();
         // TODO: detach active CDP target sessions before disconnecting.
         yield* browser.disconnect().pipe(Effect.ignore);
         yield* toolState.stage([]);
@@ -78,7 +78,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
 
         const markdownTheme = getMarkdownTheme();
 
-        yield* listWidget.show(() => {
+        yield* listWidget.set(() => {
           const widget = new Container();
           widget.addChild(new Markdown(text.value, 0, 0, markdownTheme));
           widget.addChild(new Spacer(1));
@@ -89,7 +89,7 @@ export class PiWebMcpCommandService extends Context.Service<PiWebMcpCommandServi
       const connect = Effect.fn("PiWebMcpCommandService.connect")(function*() {
         const ctx = yield* PiContext;
 
-        yield* listWidget.hide();
+        yield* listWidget.clear();
 
         const connected = yield* browser.connect({ force: true }).pipe(
           Effect.as(true),
