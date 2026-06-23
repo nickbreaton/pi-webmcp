@@ -18,7 +18,6 @@ A [Pi](https://pi.dev/) extension that connects Pi to webpages that register [We
   <img width="600" alt="Demo video thumbnail" src="https://github.com/user-attachments/assets/280d605f-ebf6-4655-9239-d17cd25fca33" />
 </a>
 
-
 ## First-time Setup
 
 1. Install this extension via npm.
