@@ -30,7 +30,7 @@
     "src/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts",
-    ".pi/extensions/**/*.ts",
+    "extensions/**/*.ts",
     "*.json",
     "README.md",
     "docs/**/*.md"

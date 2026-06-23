@@ -3,6 +3,9 @@
     {
       "source": "npm:pi-webmcp",
       "extensions": ["!**/*.ts"]
+    },
+    {
+      "source": "../"
     }
   ]
 }

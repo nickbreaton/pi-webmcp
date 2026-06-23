@@ -19,9 +19,8 @@
     "webmcp"
   ],
   "files": [
-    ".pi/extensions/**",
-    "src/**",
-    "docs/**"
+    "extensions/**",
+    "src/**"
   ],
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -56,7 +55,7 @@
   },
   "pi": {
     "extensions": [
-      ".pi/extensions/pi-webmcp.ts"
+      "extensions/pi-webmcp.ts"
     ]
   }
 }

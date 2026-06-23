@@ -16,7 +16,7 @@
     ]
   },
   "include": [
-    ".pi/extensions/**/*.ts",
+    "extensions/**/*.ts",
     "src/**/*.ts",
     "test/**/*.ts",
     "vitest.config.ts"
