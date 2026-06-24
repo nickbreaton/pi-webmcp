@@ -31,7 +31,9 @@
     "prepack": "npm run typecheck && npm test && npm run fmt:check"
   },
   "dependencies": {
+    "@effect/opentelemetry": "^4.0.0-beta.84",
     "@effect/platform-node": "4.0.0-beta.84",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.214.0",
     "chrome-remote-interface": "^0.33.3",
     "effect": "4.0.0-beta.84",
     "micro-memoize": "^5.1.1"
@@ -41,11 +43,23 @@
     "@earendil-works/pi-tui": "*",
     "typebox": "*"
   },
+  "overrides": {
+    "@kitlangton/motel": {
+      "@effect/atom-react": "4.0.0-beta.49",
+      "@effect/opentelemetry": "4.0.0-beta.49",
+      "@effect/platform-bun": "4.0.0-beta.50",
+      "@effect/platform-node-shared": "4.0.0-beta.50",
+      "effect": "4.0.0-beta.49"
+    }
+  },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.78.1",
     "@earendil-works/pi-tui": "^0.78.1",
     "@effect/language-service": "^0.86.2",
     "@effect/vitest": "4.0.0-beta.84",
+    "@kitlangton/motel": "^0.2.5",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-trace-web": "^2.8.0",
     "@types/chrome-remote-interface": "^0.34.0",
     "@types/node": "^25.9.2",
     "dprint": "^0.54.0",

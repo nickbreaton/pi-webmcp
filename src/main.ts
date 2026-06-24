@@ -14,6 +14,7 @@ import { PiWebMcpDescribeService } from "./services/PiWebMcpDescribeService";
 import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpListWidgetService } from "./services/PiWebMcpListWidgetService";
+import { PiWebMcpOpenTelemetryLive } from "./services/PiWebMcpOpenTelemetry";
 import { PiWebMcpServeService } from "./services/PiWebMcpServeService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
@@ -39,6 +40,7 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       Layer.succeed(PiContext, ctx),
       BrowserClient.live,
       NodeHttpServer.layerHttpServices,
+      PiWebMcpOpenTelemetryLive,
     )),
   );
 
@@ -66,7 +68,9 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       }),
     renderResult: renderPiWebMcpMarkdownResult,
     async execute(_, params) {
-      return runtime.runPromise(PiWebMcpListService.use((service) => service.execute(params)));
+      return runtime.runPromise(PiWebMcpListService.use((service) => service.execute(params)).pipe(
+        Effect.withSpan("pi-webmcp.tool.webmcp_list"),
+      ));
     },
   });
 
@@ -90,7 +94,9 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       }),
     renderResult: renderPiWebMcpResult,
     async execute(_, params) {
-      return runtime.runPromise(PiWebMcpDescribeService.use((service) => service.execute(params)));
+      return runtime.runPromise(PiWebMcpDescribeService.use((service) => service.execute(params)).pipe(
+        Effect.withSpan("pi-webmcp.tool.webmcp_describe"),
+      ));
     },
   });
 
@@ -116,7 +122,9 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       }),
     renderResult: renderPiWebMcpResult,
     async execute(_toolCallId, params) {
-      return runtime.runPromise(PiWebMcpExecuteService.use((service) => service.execute(params)));
+      return runtime.runPromise(PiWebMcpExecuteService.use((service) => service.execute(params)).pipe(
+        Effect.withSpan("pi-webmcp.tool.webmcp_execute"),
+      ));
     },
   });
 
@@ -140,7 +148,9 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
       }),
     renderResult: renderPiWebMcpServeResult,
     async execute(_, params) {
-      return runtime.runPromise(PiWebMcpServeService.use((service) => service.execute(params)));
+      return runtime.runPromise(PiWebMcpServeService.use((service) => service.execute(params)).pipe(
+        Effect.withSpan("pi-webmcp.tool.webmcp_serve"),
+      ));
     },
   });
 
@@ -228,5 +238,7 @@ export async function handle(pi: ExtensionAPI, args: string, ctx: ExtensionComma
     return service.handle(args);
   });
 
-  await runtime.runPromise(effect);
+  await runtime.runPromise(effect.pipe(
+    Effect.withSpan("pi-webmcp.command", { attributes: { "pi_webmcp.args": args } }),
+  ));
 }
