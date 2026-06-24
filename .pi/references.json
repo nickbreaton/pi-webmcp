@@ -1,0 +1,8 @@
+{
+  "references": {
+    "effect": {
+      "repository": "https://github.com/Effect-TS/effect-smol",
+      "description": "Use for looking up Effect source code as reference"
+    }
+  }
+}
