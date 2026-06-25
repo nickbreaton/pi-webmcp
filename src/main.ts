@@ -15,8 +15,10 @@ import { PiWebMcpExecuteService } from "./services/PiWebMcpExecuteService";
 import { PiWebMcpListService } from "./services/PiWebMcpListService";
 import { PiWebMcpListWidgetService } from "./services/PiWebMcpListWidgetService";
 import { PiWebMcpServeService } from "./services/PiWebMcpServeService";
+import { PiWebMcpSettingsService } from "./services/PiWebMcpSettingsService";
 import { PiWebMcpSystemPromptService } from "./services/PiWebMcpSystemPromptService";
 import { PiWebMcpToolStateService } from "./services/PiWebMcpToolStateService";
+import { PiWebMcpTracer } from "./services/PiWebMcpTracer";
 import { WebMcpToolDiffService } from "./services/WebMcpToolDiffService";
 import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult, renderPiWebMcpServeResult } from "./utils/renderers";
@@ -41,6 +43,10 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(BrowserClient.live),
     Layer.provideMerge(NodeHttpServer.layerHttpServices),
     Layer.provideMerge(piLayer),
+    Layer.provideMerge(PiWebMcpTracer.layer.pipe(
+      Layer.provide(PiWebMcpSettingsService.live),
+      Layer.provide(piLayer),
+    )),
   );
 
   const runtime = ManagedRuntime.make(live);

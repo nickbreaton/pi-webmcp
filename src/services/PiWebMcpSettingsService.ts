@@ -8,6 +8,7 @@ export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsSer
   readonly allowedOrigins: Option.Option<ReadonlySet<Origin>>;
   readonly disallowedOrigins: Option.Option<ReadonlySet<Origin>>;
   readonly cdpUrl: URL;
+  readonly otel: Option.Option<URL | boolean>;
 }>()("pi-webmcp/PiWebMcpSettingsService") {
   static readonly live = Layer.effect(
     PiWebMcpSettingsService,
@@ -45,8 +46,9 @@ export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsSer
       );
 
       const cdpUrl = projectWebMcp?.cdp ?? globalWebMcp?.cdp ?? (yield* Schema.decodeEffect(CdpUrl)(9222));
+      const otel = Option.fromUndefinedOr(projectWebMcp?.otel ?? globalWebMcp?.otel);
 
-      return PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins, cdpUrl });
+      return PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins, cdpUrl, otel });
     }),
   );
 }

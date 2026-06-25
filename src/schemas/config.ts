@@ -19,6 +19,7 @@ export class PiWebMcpSettings extends Schema.Class<PiWebMcpSettings>("pi-webmcp/
   allowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
   disallowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
   cdp: Schema.optionalKey(CdpUrl),
+  otel: Schema.optionalKey(Schema.Union([Schema.URLFromString, Schema.Boolean])),
 }) {}
 
 export class PiSettings extends Schema.Class<PiSettings>("pi-webmcp/PiSettings")({

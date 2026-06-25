@@ -31,7 +31,11 @@
     "prepack": "npm run typecheck && npm test && npm run fmt:check"
   },
   "dependencies": {
+    "@effect/opentelemetry": "4.0.0-beta.84",
     "@effect/platform-node": "4.0.0-beta.84",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
+    "@opentelemetry/sdk-trace-node": "^2.8.0",
     "chrome-remote-interface": "^0.33.3",
     "effect": "4.0.0-beta.84",
     "micro-memoize": "^5.1.1"
