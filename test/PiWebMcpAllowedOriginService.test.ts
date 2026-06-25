@@ -17,7 +17,7 @@ const makeSettingsLayer = ({
 }: MakeSettingsLayerOptions): Layer.Layer<PiWebMcpSettingsService> =>
   Layer.succeed(
     PiWebMcpSettingsService,
-    PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins }),
+    PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins } as PiWebMcpSettingsService["Service"]),
   );
 
 describe("PiWebMcpAllowedOriginService", () => {

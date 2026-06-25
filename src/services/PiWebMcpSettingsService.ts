@@ -1,11 +1,27 @@
 import { getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
-import { Context, Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema, SchemaIssue, SchemaTransformation } from "effect";
 import { Origin } from "../schemas/WebMcpTool";
 import { PiContext } from "./PiApi";
+
+const CdpUrl = Schema.Union([Schema.Number, Schema.URLFromString]).pipe(
+  Schema.decodeTo(
+    Schema.URL,
+    SchemaTransformation.transformOrFail({
+      decode: (cdp) => {
+        const url = typeof cdp === "number" ? new URL(`ws://127.0.0.1:${cdp}/devtools/browser`) : cdp;
+        return url.protocol === "ws:" || url.protocol === "wss:"
+          ? Effect.succeed(url)
+          : Effect.fail(new SchemaIssue.InvalidValue(Option.some(url), { message: "CDP URL must use ws:// or wss://" }));
+      },
+      encode: (url) => Effect.succeed(url),
+    }),
+  ),
+);
 
 export class PiWebMcpSettings extends Schema.Class<PiWebMcpSettings>("pi-webmcp/PiWebMcpSettings")({
   allowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
   disallowedOrigins: Schema.optionalKey(Schema.Array(Schema.String)),
+  cdp: Schema.optionalKey(CdpUrl),
 }) {}
 
 class PiSettings extends Schema.Class<PiSettings>("pi-webmcp/PiSettings")({
@@ -15,6 +31,7 @@ class PiSettings extends Schema.Class<PiSettings>("pi-webmcp/PiSettings")({
 export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsService, {
   readonly allowedOrigins: Option.Option<ReadonlySet<Origin>>;
   readonly disallowedOrigins: Option.Option<ReadonlySet<Origin>>;
+  readonly cdpUrl: URL;
 }>()("pi-webmcp/PiWebMcpSettingsService") {
   static readonly live = Layer.effect(
     PiWebMcpSettingsService,
@@ -51,7 +68,9 @@ export class PiWebMcpSettingsService extends Context.Service<PiWebMcpSettingsSer
         (origins) => normalizeOrigins(origins),
       );
 
-      return PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins });
+      const cdpUrl = projectWebMcp?.cdp ?? globalWebMcp?.cdp ?? (yield* Schema.decodeEffect(CdpUrl)(9222));
+
+      return PiWebMcpSettingsService.of({ allowedOrigins, disallowedOrigins, cdpUrl });
     }),
   );
 }

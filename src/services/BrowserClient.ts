@@ -1,6 +1,7 @@
 import CDP from "chrome-remote-interface";
 import type { Client } from "chrome-remote-interface";
 import { Context, Effect, Layer, Option, Ref, Schema, Scope } from "effect";
+import { PiWebMcpSettingsService } from "./PiWebMcpSettingsService";
 
 // The Chrome type package only includes the standard protocol schema, but WebMCP
 // exposes experimental `WebMCP.*` commands/events through the same CDP client.
@@ -12,10 +13,6 @@ export type CdpClient = Client & {
   off?(method: string, cb: (params: any, sessionId?: string) => void): void;
 };
 
-const DEFAULT_HOST = process.env.CDP_HOST ?? "127.0.0.1";
-const DEFAULT_PORT = Number(process.env.CDP_PORT ?? 9222);
-const DEFAULT_WS = process.env.CDP_WS ?? `ws://${DEFAULT_HOST}:${DEFAULT_PORT}/devtools/browser`;
-
 export class BrowserClientError extends Schema.TaggedErrorClass<BrowserClientError>()("BrowserClientError", {
   operation: Schema.Union([Schema.Literal("connect"), Schema.Literal("disconnect")]),
   cause: Schema.Unknown,
@@ -26,12 +23,13 @@ export class BrowserClient extends Context.Service<BrowserClient, {
   readonly get: Effect.Effect<Option.Option<CdpClient>>;
   readonly disconnect: () => Effect.Effect<void, BrowserClientError>;
 }>()("pi-webmcp/BrowserClient") {
-  static readonly live = Layer.effect(
+  static readonly liveWithoutDependencies = Layer.effect(
     BrowserClient,
     Effect.gen(function*() {
       const clientRef = yield* Ref.make<Option.Option<CdpClient>>(Option.none());
       const scope = yield* Effect.scope;
       const context = yield* Effect.context();
+      const settings = yield* PiWebMcpSettingsService;
 
       const clear = Ref.set(clientRef, Option.none());
 
@@ -50,7 +48,7 @@ export class BrowserClient extends Context.Service<BrowserClient, {
 
         const client = yield* Effect.acquireRelease(
           Effect.tryPromise({
-            try: () => CDP({ target: DEFAULT_WS, local: true }),
+            try: () => CDP({ target: settings.cdpUrl.href, local: true }),
             catch: (cause) => new BrowserClientError({ operation: "connect", cause }),
           }),
           (client) =>
@@ -86,5 +84,9 @@ export class BrowserClient extends Context.Service<BrowserClient, {
         disconnect,
       });
     }),
+  );
+
+  static readonly live = BrowserClient.liveWithoutDependencies.pipe(
+    Layer.provide(PiWebMcpSettingsService.live),
   );
 }

@@ -22,6 +22,10 @@ import { WebMcpToolsService } from "./services/WebMcpToolsService";
 import { renderPiWebMcpCall, renderPiWebMcpListMessage, renderPiWebMcpMarkdownResult, renderPiWebMcpResult, renderPiWebMcpServeResult } from "./utils/renderers";
 
 const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
+  const piLayer = Layer.mergeAll(
+    Layer.succeed(PiApi, pi),
+    Layer.succeed(PiContext, ctx),
+  );
   const live = PiWebMcpCommandService.liveWithoutDependencies.pipe(
     Layer.provideMerge(PiWebMcpDescribeService.live),
     Layer.provideMerge(PiWebMcpExecuteService.live),
@@ -34,12 +38,9 @@ const init = memoize((pi: ExtensionAPI, ctx: ExtensionCommandContext) => {
     Layer.provideMerge(WebMcpToolDiffService.live),
     Layer.provideMerge(WebMcpToolsService.live),
     Layer.provideMerge(PiWebMcpAllowedOriginService.live),
-    Layer.provideMerge(Layer.mergeAll(
-      Layer.succeed(PiApi, pi),
-      Layer.succeed(PiContext, ctx),
-      BrowserClient.live,
-      NodeHttpServer.layerHttpServices,
-    )),
+    Layer.provideMerge(BrowserClient.live),
+    Layer.provideMerge(NodeHttpServer.layerHttpServices),
+    Layer.provideMerge(piLayer),
   );
 
   const runtime = ManagedRuntime.make(live);
