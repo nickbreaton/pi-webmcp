@@ -65,11 +65,11 @@ Configure WebMCP options under the `webmcp` key in Pi settings, either globally 
 }
 ```
 
-| Option                     | Description                                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `webmcp.allowedOrigins`    | When specified, Pi will only discover and connect to WebMCP tools from these origins.                                    |
-| `webmcp.disallowedOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins.                                      |
-| `webmcp.cdp`               | Chrome DevTools Protocol endpoint. Accepts a local port number or a `ws://` / `wss://` debugger URL. Defaults to `9222`. |
+| Option                     | Description                                                                           |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `webmcp.allowedOrigins`    | When specified, Pi will only discover and connect to WebMCP tools from these origins. |
+| `webmcp.disallowedOrigins` | When specified, Pi will not discover or connect to WebMCP tools from these origins.   |
+| `webmcp.cdp`               | Custom Chrome DevTools Protocol port or browser websocket URL to connect to.          |
 
 ## Browser Support
 
